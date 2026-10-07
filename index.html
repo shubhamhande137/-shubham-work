@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#174a92">
 <title>Shubham Work Diary Module</title>
 <style>
 *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6f9;color:#263238}
@@ -34,7 +33,7 @@ textarea{width:100%;min-height:100px;resize:vertical}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 .uploadbox{border:2px dashed #9aa9b8;border-radius:8px;padding:18px;background:#f8fafc;margin-top:12px}
 .memberlist{max-height:320px;overflow-y:auto;border:1px solid #d5dbe1;border-radius:6px;margin-top:12px}
@@ -73,6 +72,11 @@ textarea{width:100%;min-height:100px;resize:vertical}
     <option value="">All Status</option><option>Completed</option><option>Pending</option><option>Forwarded</option>
    </select>
    <button onclick="window.print()">Print Diary</button>
+   <button class="gray" onclick="exportDiaryBackup()">Backup Data</button>
+   <button class="gray" onclick="document.getElementById('backupFile').click()">Restore Backup</button>
+   <input type="file" id="backupFile" accept=".json" style="display:none" onchange="restoreDiaryBackup(event)">
+   <input type="date" id="pdfDate" title="Select date for PDF">
+   <button onclick="generateDatePdf()">Generate PDF by Date</button>
   </div>
  </div>
 
@@ -89,7 +93,7 @@ textarea{width:100%;min-height:100px;resize:vertical}
  <div class="card">
   <div class="tablewrap">
    <table>
-    <thead><tr><th>Sr. No.</th><th>Day / Date</th><th>Work / Task</th><th>Status / Remarks</th><th class="no-print">Action</th></tr></thead>
+    <thead><tr><th>Sr. No.</th><th>Day / Date</th><th>Member Name</th><th>Member ID</th><th>UAN</th><th>Work / Task</th><th>Status / Remarks</th><th class="no-print">Action</th></tr></thead>
     <tbody id="rows"></tbody>
    </table>
   </div>
@@ -106,10 +110,9 @@ textarea{width:100%;min-height:100px;resize:vertical}
   </div>
   <div class="uploadbox">
    <b>Upload Ledger</b><br>
-   <span class="small">Upload Excel (.xlsx/.xls), CSV, or PDF. For PDF, the module extracts selectable text and identifies Member ID, UAN, Name and Establishment where available.</span>
+   <span class="small">Upload Excel (.xlsx/.xls) or CSV. The module reads the rows and extracts Member ID, UAN, Name and Establishment where available.</span>
    <div style="margin-top:10px">
-    <button type="button" onclick="document.getElementById('ledgerFile').click()">📁 Browse Ledger File</button>
-   <input type="file" id="ledgerFile" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none" onchange="document.getElementById('ledgerFileName').textContent=this.files.length?this.files[0].name:'No file selected'"> <span id="ledgerFileName" class="small">No file selected</span>
+    <input type="file" id="ledgerFile" accept=".xlsx,.xls,.csv">
     <button onclick="processLedger()">Fetch Ledger Data</button>
    </div>
    <div id="uploadStatus" class="small" style="margin-top:8px"></div>
@@ -151,10 +154,10 @@ textarea{width:100%;min-height:100px;resize:vertical}
 
 <section id="fetch" class="hidden">
  <div class="card">
-  <div class="title">Fetch Work by Particular Date & Member ID / UAN</div>
+  <div class="title">Search Work by Member ID / UAN</div>
   <div class="controls">
-   <label><b>Date:</b></label>
-   <input type="date" id="fetchDate" value="2026-10-07">
+   <label><b>Date (optional):</b></label>
+   <input type="date" id="fetchDate">
    <label><b>Search by:</b></label>
    <select id="fetchType">
     <option value="memberId">Member ID</option>
@@ -165,18 +168,17 @@ textarea{width:100%;min-height:100px;resize:vertical}
    <button class="gray" onclick="clearFetch()">Clear</button>
   </div>
   <div class="small" style="margin-top:10px">
-   Enter the exact date and either Member ID or UAN. The module will show all work recorded for that member on that date.
+   Select <b>Member ID</b> or <b>UAN</b> and enter the number. Leave the date blank to search all recorded dates, or select a date to narrow the result.
   </div>
  </div>
 
  <div class="card" id="fetchResult" style="display:none">
   <div class="title">Fetched Work Details</div>
   <div id="fetchMemberDetails" class="info"></div>
-  <div id="fetchDeleteArea" style="margin-top:12px"></div>
   <div class="tablewrap" style="margin-top:12px">
    <table style="min-width:850px">
     <thead>
-     <tr><th>Sr. No.</th><th>Date</th><th>Member ID</th><th>UAN</th><th>Name</th><th>Work Done</th><th>Status / Remarks</th><th class="no-print">Action</th></tr>
+     <tr><th>Sr. No.</th><th>Date</th><th>Member ID</th><th>UAN</th><th>Name</th><th>Work Done</th><th>Status / Remarks</th></tr>
     </thead>
     <tbody id="fetchRows"></tbody>
    </table>
@@ -188,15 +190,23 @@ textarea{width:100%;min-height:100px;resize:vertical}
  <div class="card">
   <div class="title">Manual Add / Update Work Entry</div>
   <div class="formgrid">
-   <label>Date</label><input type="date" id="edate" value="2026-10-07">
+   <label>Date</label><input type="date" id="edate">
    <label>Status</label>
    <select id="estatus"><option>Completed</option><option>Pending</option><option>Forwarded</option></select>
+   <label>Member Name</label><input id="ememberName" placeholder="Member name">
+   <label>Member ID</label><input id="ememberId" placeholder="Member ID">
+   <label>UAN</label><input id="euan" placeholder="UAN">
   </div>
   <div style="margin-top:14px"><label style="font-weight:700;color:#174a92">Work / Task</label>
    <textarea id="etask" placeholder="Enter today's work details..."></textarea>
   </div>
   <div style="margin-top:14px"><label style="font-weight:700;color:#174a92">Status / Remarks</label>
    <textarea id="eremark" placeholder="Enter remarks / outcome..."></textarea>
+  </div>
+  <div style="margin-top:14px">
+   <label style="font-weight:700;color:#174a92">Attach PDF (optional)</label><br>
+   <input type="file" id="epdf" accept="application/pdf,.pdf">
+   <div id="currentPdf" class="small" style="margin-top:6px">No PDF attached</div>
   </div>
   <div class="actions">
    <button onclick="saveEntry()">Save Entry</button>
@@ -216,394 +226,251 @@ textarea{width:100%;min-height:100px;resize:vertical}
 </div>
 
 <script>
+const STORAGE_KEY = "shubham_work_diary_v3";
+
 let diary = [
- {date:"2026-09-15",task:"Prepared and examined EPFO claim/submission work and routine settlement cases.",status:"Completed",remark:"Work processed and records updated."},
- {date:"2026-09-16",task:"Parul Jhaver pension-related submission forwarded to Delhi office.",status:"Forwarded",remark:"Reply of grievance No. MOLBR/E/2026/0190803 prepared/given."},
- {date:"2026-10-05",task:"Claim process; PMO reply given; EPGMIS reply given.",status:"Completed",remark:"Replies and claim-related work completed."},
- {date:"2026-10-06",task:"Examined settlement submission for Form-20, Form-10D and Form-5IF in respect of late Shri Sukanta Ghosh under A/c Gr. 3/2; verified death and supporting documents.",status:"Completed",remark:"Member/death details and supporting documents examined."},
- {date:"2026-10-07",task:"Processed 2 death cases in Form-10D / related death-case work.",status:"Completed",remark:"Two death cases processed today."}
+ {date:"2026-09-15",task:"Prepared and examined EPFO claim/submission work and routine settlement cases.",status:"Completed",remark:"Work processed and records updated.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-09-16",task:"Parul Jhaver pension-related submission forwarded to Delhi office.",status:"Forwarded",remark:"Reply of grievance No. MOLBR/E/2026/0190803 prepared/given.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-05",task:"Claim process; PMO reply given; EPGMIS reply given.",status:"Completed",remark:"Replies and claim-related work completed.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-06",task:"Examined settlement submission for Form-20, Form-10D and Form-5IF in respect of late Shri Sukanta Ghosh under A/c Gr. 3/2; verified death and supporting documents.",status:"Completed",remark:"Member/death details and supporting documents examined.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-07",task:"Processed 2 death cases in Form-10D / related death-case work.",status:"Completed",remark:"Two death cases processed today.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""}
 ];
 
-let editIndex=-1;
+let editIndex=-1, ledgerMembers=[], selectedMemberIndexes=new Set(), selectedWorkType="";
 
+const workTypes = [
+ "Death claim review and submission","F-20 process","F-5IF process","F-10D process",
+ "Ac-1 to Ac-10","Ac-10 to Ac-1","EPS service add","F-13 amount reaccredited",
+ "Other claim return amount added","Special Vdr-other cases","Grievance Reply","RTI reply",
+ "Submission Done","Claim Process","Submission Process","Process Completed"
+];
+
+function escapeHtml(s){
+ s=String(s??"");
+ return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
 function fmtDate(s){
  const d=new Date(s+"T00:00:00");
  return d.toLocaleDateString("en-IN",{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 function day(s){
- const d=new Date(s+"T00:00:00");
- return d.toLocaleDateString("en-IN",{weekday:"long"});
+ return new Date(s+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long"});
 }
-
-const workTypes = [
- "Death claim review and submission",
- "F-20 process",
- "F-5IF process",
- "F-10D process",
- "Ac-1 to Ac-10",
- "Ac-10 to Ac-1",
- "EPS service add",
- "F-13 amount reaccredited",
- "Other claim return amount added",
- "Special Vdr-other cases",
- "Grievance Reply",
- "RTI reply"
-];
-
-let ledgerMembers=[];
-let selectedMemberIndexes=new Set();
-let selectedWorkType="";
-
-function populateWorkTypes(){
- const box=document.getElementById("workOptions");
- box.innerHTML="";
- workTypes.forEach((w,i)=>{
-   const d=document.createElement("div");
-   d.className="work-option"+(w===selectedWorkType?" selected":"");
-   d.textContent=w;
-   d.onclick=()=>{selectedWorkType=w;populateWorkTypes()};
-   box.appendChild(d);
- });
+function normalizeEntry(x){
+ return {...x,memberName:x.memberName||"",memberId:x.memberId||"",uan:x.uan||"",pdfName:x.pdfName||"",pdfData:x.pdfData||""};
 }
-populateWorkTypes();
-
-function normalizeHeader(x){
- return String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function saveDiary(){
+ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(diary));}
+ catch(e){alert("Could not save. Browser storage may be full, especially if many PDFs are attached. Please use Backup Data and remove large PDF attachments.");}
 }
-function findValue(row, names){
- const keys=Object.keys(row);
- for(const wanted of names){
-   const nk=normalizeHeader(wanted);
-   const key=keys.find(k=>normalizeHeader(k).includes(nk));
-   if(key && row[key]!==undefined && row[key]!==null) return String(row[key]).trim();
- }
- return "";
-}
-function processLedger(){
- const file=document.getElementById("ledgerFile").files[0];
- if(!file){alert("Please select a ledger file.");return}
- const status=document.getElementById("uploadStatus");
- status.textContent="Reading ledger...";
- const name=file.name.toLowerCase();
- if(name.endsWith(".pdf") || file.type === "application/pdf"){
-   processPdfLedger(file);
-   return;
- }
- const reader=new FileReader();
- reader.onload=e=>{
-  try{
-   const data=new Uint8Array(e.target.result);
-   const wb=XLSX.read(data,{type:"array"});
-   const ws=wb.Sheets[wb.SheetNames[0]];
-   const raw=XLSX.utils.sheet_to_json(ws,{defval:""});
-   ledgerMembers=raw.map((r,i)=>({
-     sourceRow:i+2,
-     memberId:findValue(r,["Member ID","MemberId","MID","PF Number","PF No"]),
-     uan:findValue(r,["UAN"]),
-     name:findValue(r,["Name","Member Name"]),
-     establishment:findValue(r,["Establishment","Establishment Name","Employer"]),
-     raw:r
-   })).filter(x=>x.memberId||x.uan||x.name);
-   renderMembers();
-   status.textContent=`Loaded ${ledgerMembers.length} member row(s) from ${file.name}.`;
-   document.getElementById("memberArea").style.display=ledgerMembers.length?"block":"none";
-  }catch(err){
-   console.error(err); status.textContent="Could not read the ledger. Check that it is a valid Excel/CSV file.";
-  }
- };
- reader.readAsArrayBuffer(file);
-}
-
-async function processPdfLedger(file){
- const status=document.getElementById("uploadStatus");
+function loadDiary(){
  try{
-   if(!window.pdfjsLib){ throw new Error("PDF library not loaded"); }
-   status.textContent="Reading PDF...";
-   const buffer=await file.arrayBuffer();
-   const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
-   let pages=[];
-   for(let pageNo=1; pageNo<=pdf.numPages; pageNo++){
-     status.textContent=`Reading PDF page ${pageNo} of ${pdf.numPages}...`;
-     const page=await pdf.getPage(pageNo);
-     const content=await page.getTextContent();
-     const items=content.items||[];
-     const lines={};
-     items.forEach(item=>{
-       const y=Math.round(item.transform[5]);
-       const key=Object.keys(lines).find(k=>Math.abs(Number(k)-y)<=3)||String(y);
-       lines[key]=(lines[key]?lines[key]+" ":"")+String(item.str||"").trim();
-     });
-     Object.keys(lines).sort((a,b)=>Number(b)-Number(a)).forEach(k=>{
-       const line=lines[k].replace(/\s+/g," ").trim();
-       if(line) pages.push(line);
-     });
-   }
-   const text=pages.join("\n");
-   if(!text.trim()){
-     status.textContent="This PDF appears to be scanned/image-only. Text could not be extracted.";
-     alert("This PDF appears to be scanned/image-only. Please use a text/selectable PDF or Excel ledger. OCR can be added separately.");
-     return;
-   }
-   ledgerMembers=parsePdfMembers(text);
-   selectedMemberIndexes.clear();
-   renderMembers();
-   document.getElementById("memberArea").style.display=ledgerMembers.length?"block":"none";
-   status.textContent=`Loaded ${ledgerMembers.length} member row(s) from PDF ${file.name}.`;
-   if(!ledgerMembers.length){
-     status.textContent="PDF text was read, but no recognizable Member ID/UAN/Name rows were found.";
-   }
- }catch(err){
-   console.error(err);
-   status.textContent="Could not read the PDF. Please check that it is a valid text/selectable PDF.";
- }
+  const saved=localStorage.getItem(STORAGE_KEY);
+  if(saved){const p=JSON.parse(saved);if(Array.isArray(p)) diary=p.map(normalizeEntry);}
+ }catch(e){console.warn(e);}
 }
-
-function parsePdfMembers(text){
- const lines=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
- const out=[];
- const seen=new Set();
- const uanRe=/\b\d{12}\b/g;
- const midRe=/\b[A-Z]{2,5}[A-Z0-9]{3,}\d{4,}\b/g;
- for(let i=0;i<lines.length;i++){
-   const line=lines[i];
-   const uans=line.match(uanRe)||[];
-   const mids=line.match(midRe)||[];
-   if(!uans.length && !mids.length) continue;
-   const uan=uans[0]||"";
-   const memberId=mids.find(x=>!/^\d+$/.test(x))||"";
-   const combined=[lines[i-1]||"",line,lines[i+1]||""].join(" ");
-   let name="";
-   const nm=combined.match(/(?:member\s*name|name)\s*[:\-]?\s*([A-Za-z][A-Za-z .,'-]{2,60})/i);
-   if(nm) name=nm[1].trim();
-   let establishment="";
-   const em=combined.match(/(?:establishment(?:\s*name)?|employer)\s*[:\-]?\s*([^|]+?)(?=\s+(?:UAN|Member|Name)\s*[:\-]|$)/i);
-   if(em) establishment=em[1].trim();
-   const key=(memberId||"")+"|"+(uan||"")+"|"+name;
-   if((memberId||uan||name) && !seen.has(key)){
-     seen.add(key);
-     out.push({sourceRow:i+1,memberId,uan,name,establishment,raw:{source:"PDF",text:line}});
-   }
- }
- // Fallback: if the PDF has UANs but no recognizable labels, make one row per UAN.
- if(!out.length){
-   const all=[...text.matchAll(/\b\d{12}\b/g)].map(m=>m[0]);
-   [...new Set(all)].forEach((u,i)=>out.push({sourceRow:i+1,memberId:"",uan:u,name:"",establishment:"",raw:{source:"PDF"}}));
- }
- return out;
-}
-function renderMembers(){
- const list=document.getElementById("memberList");
- list.innerHTML=`<div class="memberrow head"><span>✓</span><span>Member ID</span><span>UAN</span><span>Name</span><span>Establishment</span></div>`;
- ledgerMembers.forEach((m,i)=>{
-  const row=document.createElement("label");
-  row.className="memberrow";
-  row.innerHTML=`<input type="checkbox" ${selectedMemberIndexes.has(i)?"checked":""} onchange="toggleMember(${i},this.checked)">
-   <span>${escapeHtml(m.memberId||"-")}</span><span>${escapeHtml(m.uan||"-")}</span>
-   <span>${escapeHtml(m.name||"-")}</span><span>${escapeHtml(m.establishment||"-")}</span>`;
-  list.appendChild(row);
- });
-}
-function toggleMember(i,checked){checked?selectedMemberIndexes.add(i):selectedMemberIndexes.delete(i);renderSelectedMembers()}
-function selectAllMembers(){ledgerMembers.forEach((_,i)=>selectedMemberIndexes.add(i));renderMembers();renderSelectedMembers()}
-function clearMemberSelection(){selectedMemberIndexes.clear();renderMembers();renderSelectedMembers()}
-function moveSelectedToWork(){
- if(!selectedMemberIndexes.size){alert("Select at least one member.");return}
- document.getElementById("todayWorkCard").style.display="block";
- renderSelectedMembers();
- populateWorkTypes();
- document.getElementById("todayWorkCard").scrollIntoView({behavior:"smooth"});
-}
-function renderSelectedMembers(){
- const box=document.getElementById("selectedMembers");
- box.innerHTML="";
- [...selectedMemberIndexes].forEach(i=>{
-  const m=ledgerMembers[i];
-  const chip=document.createElement("span");chip.className="member-chip";
-  chip.textContent=(m.name||"Member")+" | "+(m.memberId||m.uan||"");
-  box.appendChild(chip);
- });
-}
-function addSelectedWork(){
- if(!selectedMemberIndexes.size){alert("Select member(s) first.");return}
- if(!selectedWorkType){alert("Please select the type of work.");return}
- const date=document.getElementById("ledgerDate").value;
- const remark=document.getElementById("bulkRemark").value.trim();
- [...selectedMemberIndexes].forEach(i=>{
-   const m=ledgerMembers[i];
-   const details=[
-     selectedWorkType,
-     m.name?`Member: ${m.name}`:"",
-     m.memberId?`Member ID: ${m.memberId}`:"",
-     m.uan?`UAN: ${m.uan}`:"",
-     m.establishment?`Establishment: ${m.establishment}`:"",
-   ].filter(Boolean).join(" — ");
-   const finalRemark=remark||"Work added from uploaded ledger.";
-   const duplicate=diary.some(x=>x.date===date && x.task===details);
-   if(!duplicate) diary.push({date,task:details,status:"Completed",remark:finalRemark});
- });
- alert(`${selectedMemberIndexes.size} member work entr${selectedMemberIndexes.size===1?"y":"ies"} added to ${fmtDate(date)}.`);
- document.getElementById("bulkRemark").value="";
- selectedMemberIndexes.clear();renderMembers();renderSelectedMembers();render();
-}
+loadDiary();
 
 function render(){
- const q=document.getElementById("search").value.toLowerCase();
+ const q=(document.getElementById("search").value||"").toLowerCase();
  const fs=document.getElementById("filterStatus").value;
  const from=document.getElementById("from").value,to=document.getElementById("to").value;
- const filtered=diary.map((x,i)=>({...x,i})).filter(x=>
-   (!from||x.date>=from)&&(!to||x.date<=to)&&
-   (!fs||x.status===fs)&&
-   (!q||(x.task+" "+x.remark).toLowerCase().includes(q))
- );
- const tb=document.getElementById("rows");tb.innerHTML="";
- filtered.sort((a,b)=>a.date.localeCompare(b.date));
+ const filtered=diary.map((x,i)=>({...normalizeEntry(x),i})).filter(x=>
+  (!from||x.date>=from)&&(!to||x.date<=to)&&(!fs||x.status===fs)&&
+  (!q||[x.task,x.remark,x.memberName,x.memberId,x.uan,x.pdfName].join(" ").toLowerCase().includes(q))
+ ).sort((a,b)=>a.date.localeCompare(b.date));
+ const tb=document.getElementById("rows"); tb.innerHTML="";
  filtered.forEach((x,n)=>{
-   const cls=x.status.toLowerCase();
-   const tr=document.createElement("tr");
-   tr.innerHTML=`<td>${n+1}</td><td><b>${day(x.date)}</b><br>${fmtDate(x.date)}</td>
-   <td>${escapeHtml(x.task)}</td><td><span class="status ${cls}">${x.status}</span><br>${escapeHtml(x.remark)}</td>
-   <td class="no-print"><button onclick="editEntry(${x.i})">Edit</button> <button class="danger" onclick="deleteEntry(${x.i})">Delete</button></td>`;
-   tb.appendChild(tr);
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${n+1}</td>
+   <td><b>${day(x.date)}</b><br>${fmtDate(x.date)}</td>
+   <td>${escapeHtml(x.memberName||"-")}</td>
+   <td>${escapeHtml(x.memberId||"-")}</td>
+   <td>${escapeHtml(x.uan||"-")}</td>
+   <td>${escapeHtml(x.task)}</td>
+   <td><span class="status ${String(x.status).toLowerCase()}">${escapeHtml(x.status)}</span><br>${escapeHtml(x.remark||"")}${x.pdfName?`<br><span class="small">📎 ${escapeHtml(x.pdfName)}</span>`:""}</td>
+   <td class="no-print"><button onclick="editEntry(${x.i})">Edit</button> ${x.pdfData?`<button class="gray" onclick="openPdf(${x.i})">PDF</button>`:""} <button class="danger" onclick="deleteEntry(${x.i})">Delete</button></td>`;
+  tb.appendChild(tr);
  });
  document.getElementById("total").textContent=diary.length;
  document.getElementById("completed").textContent=diary.filter(x=>x.status==="Completed").length;
  document.getElementById("pending").textContent=diary.filter(x=>x.status==="Pending").length;
  document.getElementById("forwarded").textContent=diary.filter(x=>x.status==="Forwarded").length;
  document.getElementById("summaryText").innerHTML=`<p><b>Diary owner:</b> Shubham</p>
- <p><b>Period shown:</b> ${from?fmtDate(from):"Start"} to ${to?fmtDate(to):"Today"}</p>
- <p><b>Total recorded work entries:</b> ${diary.length}</p>
- <p>This prototype keeps the same table structure as the master diary: <b>Sr. No. | Day / Date | Work / Task | Status / Remarks</b>.</p>`;
-}
-function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function saveEntry(){
- const date=document.getElementById("edate").value;
- const task=document.getElementById("etask").value.trim();
- const status=document.getElementById("estatus").value;
- const remark=document.getElementById("eremark").value.trim();
- if(!date||!task){alert("Please enter date and work details.");return}
- const duplicate=diary.some((x,i)=>i!==editIndex&&x.date===date&&x.task.toLowerCase()===task.toLowerCase());
- if(duplicate){alert("A similar entry already exists for this date.");return}
- const obj={date,task,status,remark};
- if(editIndex>=0) diary[editIndex]=obj; else diary.push(obj);
- clearForm(); render(); showTab("diary",document.querySelector(".tab"));
-}
-function editEntry(i){
- editIndex=i;
- const x=diary[i];
- document.getElementById("edate").value=x.date;
- document.getElementById("etask").value=x.task;
- document.getElementById("estatus").value=x.status;
- document.getElementById("eremark").value=x.remark;
- showTab("entry",document.querySelectorAll(".tab")[1]);
-}
-function deleteEntry(i){
- if(confirm("Delete this work entry?")){diary.splice(i,1);render();}
-}
-function clearForm(){
- editIndex=-1;
- document.getElementById("edate").value="2026-10-07";
- document.getElementById("etask").value="";
- document.getElementById("estatus").value="Completed";
- document.getElementById("eremark").value="";
-}
-
-function extractMemberField(task, label){
- const re=new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*:\\s*([^—]+)");
- const m=task.match(re); return m?m[1].trim():"";
-}
-function fetchWork(){
- const date=document.getElementById("fetchDate").value;
- const type=document.getElementById("fetchType").value;
- const number=document.getElementById("fetchNumber").value.trim().toLowerCase();
- if(!date||!number){alert("Please select a date and enter Member ID or UAN.");return}
-
- const matches=diary.filter(x=>{
-   if(x.date!==date) return false;
-   const value=extractMemberField(x.task,type==="memberId"?"Member ID":"UAN").toLowerCase();
-   return value===number;
- });
-
- const result=document.getElementById("fetchResult");
- const body=document.getElementById("fetchRows");
- const details=document.getElementById("fetchMemberDetails");
- result.style.display="block";
- body.innerHTML="";
-
- if(!matches.length){
-   details.innerHTML=`<b>No work found.</b><br>No diary entry was found for ${type==="memberId"?"Member ID":"UAN"} <b>${escapeHtml(number)}</b> on <b>${fmtDate(date)}</b>.`;
-   return;
- }
-
- const first=matches[0];
- const memberId=extractMemberField(first.task,"Member ID");
- const uan=extractMemberField(first.task,"UAN");
- const name=extractMemberField(first.task,"Member");
- const establishment=extractMemberField(first.task,"Establishment");
- details.innerHTML=`<b>Date:</b> ${fmtDate(date)} &nbsp; | &nbsp;
- <b>Member:</b> ${escapeHtml(name||"-")} &nbsp; | &nbsp;
- <b>Member ID:</b> ${escapeHtml(memberId||"-")} &nbsp; | &nbsp;
- <b>UAN:</b> ${escapeHtml(uan||"-")} &nbsp; | &nbsp;
- <b>Establishment:</b> ${escapeHtml(establishment||"-")}`;
-
- const deleteArea=document.getElementById("fetchDeleteArea");
- if(type==="uan"){
-   deleteArea.innerHTML=`<button class="danger" onclick="deleteAllWorkByUAN()">Delete All Work for this UAN on this Date</button>
-   <span class="small" style="margin-left:8px">This will remove all fetched work entries for the selected UAN and date.</span>`;
- }else{
-   deleteArea.innerHTML="";
- }
-
- matches.forEach((x,i)=>{
-   const tr=document.createElement("tr");
-   tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td>
-   <td>${escapeHtml(memberId||"-")}</td><td>${escapeHtml(uan||"-")}</td>
-   <td>${escapeHtml(name||"-")}</td><td>${escapeHtml(x.task)}</td>
-   <td><span class="status ${x.status.toLowerCase()}">${escapeHtml(x.status)}</span><br>${escapeHtml(x.remark||"")}</td>
-   <td class="no-print"><button class="danger" onclick="deleteFetchedWork(${diary.indexOf(x)})">Delete</button></td>`;
-   body.appendChild(tr);
- });
-}
-function deleteFetchedWork(index){
- if(index<0 || index>=diary.length) return;
- const x=diary[index];
- if(confirm(`Delete this work entry for UAN ${extractMemberField(x.task,"UAN")||"-"}?`)){
-   diary.splice(index,1);
-   render();
-   fetchWork();
- }
-}
-function deleteAllWorkByUAN(){
- const date=document.getElementById("fetchDate").value;
- const uan=document.getElementById("fetchNumber").value.trim();
- if(!date||!uan) return;
- const before=diary.length;
- const matches=diary.filter(x=>x.date===date && extractMemberField(x.task,"UAN").trim().toLowerCase()===uan.toLowerCase());
- if(!matches.length){alert("No work found for this UAN on the selected date.");return}
- if(!confirm(`Delete ALL ${matches.length} work entr${matches.length===1?"y":"ies"} for UAN ${uan} on ${fmtDate(date)}?`)) return;
- diary=diary.filter(x=>!(x.date===date && extractMemberField(x.task,"UAN").trim().toLowerCase()===uan.toLowerCase()));
- render();
- fetchWork();
- alert(`${before-diary.length} work entr${before-diary.length===1?"y":"ies"} deleted.`);
-}
-function clearFetch(){
- document.getElementById("fetchNumber").value="";
- document.getElementById("fetchResult").style.display="none";
- document.getElementById("fetchRows").innerHTML="";
- document.getElementById("fetchDeleteArea").innerHTML="";
+  <p><b>Period shown:</b> ${from?fmtDate(from):"Start"} to ${to?fmtDate(to):"Today"}</p>
+  <p><b>Total recorded work entries:</b> ${diary.length}</p>`;
 }
 
 function showTab(id,el){
  ["diary","ledger","fetch","entry","summary"].forEach(x=>document.getElementById(x).classList.toggle("hidden",x!==id));
- document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));el.classList.add("active");
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+ if(el) el.classList.add("active");
  render();
 }
-(function initDiaryPeriod(){
- const today=new Date().toISOString().slice(0,10);
- document.getElementById("from").value="";
- document.getElementById("to").value=today;
-})();
-render();
+
+function populateWorkTypes(){
+ const box=document.getElementById("workOptions"); box.innerHTML="";
+ workTypes.forEach(w=>{
+  const d=document.createElement("div");
+  d.className="work-option"+(w===selectedWorkType?" selected":"");
+  d.textContent=w; d.onclick=()=>{selectedWorkType=w;populateWorkTypes();};
+  box.appendChild(d);
+ });
+}
+populateWorkTypes();
+
+function normalizeHeader(x){return String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function findValue(row,names){
+ const keys=Object.keys(row);
+ for(const wanted of names){
+  const nk=normalizeHeader(wanted);
+  const key=keys.find(k=>normalizeHeader(k).includes(nk));
+  if(key&&row[key]!=null)return String(row[key]).trim();
+ }
+ return "";
+}
+function processLedger(){
+ const file=document.getElementById("ledgerFile").files[0];
+ if(!file){alert("Please select a ledger file.");return;}
+ const status=document.getElementById("uploadStatus"); status.textContent="Reading ledger...";
+ const reader=new FileReader();
+ reader.onload=e=>{
+  try{
+   const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   const raw=XLSX.utils.sheet_to_json(ws,{defval:""});
+   ledgerMembers=raw.map((r,i)=>({
+    sourceRow:i+2,memberId:findValue(r,["Member ID","MemberId","MID","PF Number","PF No"]),
+    uan:findValue(r,["UAN"]),name:findValue(r,["Name","Member Name"]),
+    establishment:findValue(r,["Establishment","Establishment Name","Employer"])
+   })).filter(x=>x.memberId||x.uan||x.name);
+   selectedMemberIndexes.clear(); renderMembers(); renderSelectedMembers();
+   document.getElementById("memberArea").style.display=ledgerMembers.length?"block":"none";
+   status.textContent=`Loaded ${ledgerMembers.length} member row(s) from ${file.name}.`;
+  }catch(err){console.error(err);status.textContent="Could not read the ledger. Check Excel/CSV file.";}
+ };
+ reader.readAsArrayBuffer(file);
+}
+function renderMembers(){
+ const list=document.getElementById("memberList");
+ list.innerHTML=`<div class="memberrow head"><span>✓</span><span>Member ID</span><span>UAN</span><span>Name</span><span>Establishment</span></div>`;
+ ledgerMembers.forEach((m,i)=>{
+  const row=document.createElement("label");row.className="memberrow";
+  row.innerHTML=`<input type="checkbox" ${selectedMemberIndexes.has(i)?"checked":""} onchange="toggleMember(${i},this.checked)">
+   <span>${escapeHtml(m.memberId||"-")}</span><span>${escapeHtml(m.uan||"-")}</span><span>${escapeHtml(m.name||"-")}</span><span>${escapeHtml(m.establishment||"-")}</span>`;
+  list.appendChild(row);
+ });
+}
+function toggleMember(i,c){c?selectedMemberIndexes.add(i):selectedMemberIndexes.delete(i);renderSelectedMembers();}
+function selectAllMembers(){ledgerMembers.forEach((_,i)=>selectedMemberIndexes.add(i));renderMembers();renderSelectedMembers();}
+function clearMemberSelection(){selectedMemberIndexes.clear();renderMembers();renderSelectedMembers();}
+function moveSelectedToWork(){
+ if(!selectedMemberIndexes.size){alert("Select at least one member.");return;}
+ document.getElementById("todayWorkCard").style.display="block";renderSelectedMembers();populateWorkTypes();
+ document.getElementById("todayWorkCard").scrollIntoView({behavior:"smooth"});
+}
+function renderSelectedMembers(){
+ const box=document.getElementById("selectedMembers");box.innerHTML="";
+ [...selectedMemberIndexes].forEach(i=>{const m=ledgerMembers[i];const c=document.createElement("span");c.className="member-chip";c.textContent=(m.name||"Member")+" | "+(m.memberId||m.uan||"");box.appendChild(c);});
+}
+function addSelectedWork(){
+ if(!selectedMemberIndexes.size){alert("Select member(s) first.");return;}
+ if(!selectedWorkType){alert("Please select the type of work.");return;}
+ const date=document.getElementById("ledgerDate").value,remark=document.getElementById("bulkRemark").value.trim();
+ [...selectedMemberIndexes].forEach(i=>{
+  const m=ledgerMembers[i];
+  const duplicate=diary.some(x=>x.date===date&&x.task===selectedWorkType&&x.memberId===m.memberId&&x.uan===m.uan);
+  if(!duplicate) diary.push({date,task:selectedWorkType,status:"Completed",remark:remark||"Work added from uploaded ledger.",memberName:m.name,memberId:m.memberId,uan:m.uan,pdfName:"",pdfData:""});
+ });
+ saveDiary();render();alert("Selected member work added.");document.getElementById("bulkRemark").value="";
+}
+
+function readPdfFile(input,callback){
+ const file=input.files[0];
+ if(!file){callback("","");return;}
+ if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){alert("Please select a PDF file.");input.value="";callback("","");return;}
+ if(file.size>2*1024*1024){alert("Please use a PDF up to 2 MB for reliable browser storage.");input.value="";callback("","");return;}
+ const r=new FileReader();r.onload=()=>callback(file.name,r.result);r.readAsDataURL(file);
+}
+function saveEntry(){
+ const date=document.getElementById("edate").value,task=document.getElementById("etask").value.trim();
+ const status=document.getElementById("estatus").value,remark=document.getElementById("eremark").value.trim();
+ const memberName=document.getElementById("ememberName").value.trim(),memberId=document.getElementById("ememberId").value.trim(),uan=document.getElementById("euan").value.trim();
+ if(!date||!task){alert("Please enter date and work details.");return;}
+ const duplicate=diary.some((x,i)=>i!==editIndex&&x.date===date&&x.task.toLowerCase()===task.toLowerCase()&&x.memberId===memberId&&x.uan===uan);
+ if(duplicate){alert("A similar entry already exists for this date.");return;}
+ const old=editIndex>=0?normalizeEntry(diary[editIndex]):{};
+ const pdfInput=document.getElementById("epdf");
+ const finish=(pdfName,pdfData)=>{
+  const obj={date,task,status,remark,memberName,memberId,uan,pdfName:pdfName||old.pdfName||"",pdfData:pdfData||old.pdfData||""};
+  if(editIndex>=0)diary[editIndex]=obj;else diary.push(obj);
+  saveDiary();render();clearForm();alert(editIndex>=0?"Entry updated successfully.":"Entry saved successfully.");
+  editIndex=-1;
+ };
+ if(pdfInput.files[0]) readPdfFile(pdfInput,finish); else finish("", "");
+}
+function editEntry(i){
+ editIndex=i;const x=normalizeEntry(diary[i]);
+ document.getElementById("edate").value=x.date;document.getElementById("etask").value=x.task;document.getElementById("estatus").value=x.status;document.getElementById("eremark").value=x.remark;
+ document.getElementById("ememberName").value=x.memberName;document.getElementById("ememberId").value=x.memberId;document.getElementById("euan").value=x.uan;
+ document.getElementById("epdf").value="";
+ document.getElementById("currentPdf").innerHTML=x.pdfName?`Current PDF: <button class="gray" onclick="openPdf(${i})">${escapeHtml(x.pdfName)}</button>`:"No PDF attached";
+ showTab("entry",document.querySelectorAll(".tab")[3]);
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+function deleteEntry(i){if(confirm("Delete this work entry?")){diary.splice(i,1);saveDiary();render();}}
+function clearForm(){
+ editIndex=-1;
+ document.getElementById("edate").value=new Date().toISOString().slice(0,10);
+ document.getElementById("etask").value="";document.getElementById("estatus").value="Completed";document.getElementById("eremark").value="";
+ document.getElementById("ememberName").value="";document.getElementById("ememberId").value="";document.getElementById("euan").value="";
+ document.getElementById("epdf").value="";document.getElementById("currentPdf").textContent="No PDF attached";
+}
+function openPdf(i){
+ const x=normalizeEntry(diary[i]);if(!x.pdfData){alert("No PDF attached.");return;}
+ const w=window.open();if(w){w.document.write(`<title>${escapeHtml(x.pdfName||"PDF")}</title><iframe src="${x.pdfData}" style="width:100%;height:100vh;border:0"></iframe>`);w.document.close();}
+}
+function fetchWork(){
+ const date=document.getElementById("fetchDate").value,type=document.getElementById("fetchType").value,number=document.getElementById("fetchNumber").value.trim().toLowerCase();
+ if(!number){alert("Please enter Member ID or UAN.");return;}
+ const matches=diary.map((x,i)=>({...normalizeEntry(x),i})).filter(x=>(!date||x.date===date)&&String(type==="memberId"?x.memberId:x.uan).toLowerCase()===number);
+ const result=document.getElementById("fetchResult"),body=document.getElementById("fetchRows"),details=document.getElementById("fetchMemberDetails");
+ result.style.display="block";body.innerHTML="";
+ if(!matches.length){details.innerHTML=`<b>No work found</b> for ${escapeHtml(number)}${date?" on "+fmtDate(date):""}.`;return;}
+ const f=matches[0];
+ details.innerHTML=`<b>Member:</b> ${escapeHtml(f.memberName||"-")} &nbsp; | &nbsp; <b>Member ID:</b> ${escapeHtml(f.memberId||"-")} &nbsp; | &nbsp; <b>UAN:</b> ${escapeHtml(f.uan||"-")}`;
+ matches.forEach((x,i)=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td><td>${escapeHtml(x.memberId||"-")}</td><td>${escapeHtml(x.uan||"-")}</td><td>${escapeHtml(x.memberName||"-")}</td><td>${escapeHtml(x.task)}</td><td>${escapeHtml(x.status)}<br>${escapeHtml(x.remark||"")}${x.pdfName?`<br>📎 ${escapeHtml(x.pdfName)}`:""}</td>`;body.appendChild(tr);});
+}
+function clearFetch(){document.getElementById("fetchNumber").value="";document.getElementById("fetchDate").value="";document.getElementById("fetchResult").style.display="none";}
+function generateDatePdf(){
+ const date=document.getElementById("pdfDate").value;if(!date){alert("Select a date first.");return;}
+ const entries=diary.filter(x=>x.date===date);if(!entries.length){alert("No work entries found for "+fmtDate(date)+".");return;}
+ if(!window.jspdf?.jsPDF){alert("PDF library is still loading. Check internet connection and try again.");return;}
+ const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),margin=12,pageH=297,width=186;
+ let y=18;
+ doc.setFontSize(15);doc.setFont(undefined,"bold");doc.text("EPFO — Shubham Work Diary",margin,y);y+=8;
+ doc.setFontSize(11);doc.setFont(undefined,"normal");doc.text("Date: "+day(date)+", "+fmtDate(date),margin,y);y+=8;doc.line(margin,y,198,y);y+=7;
+ entries.forEach((x,i)=>{
+  const lines=doc.splitTextToSize(`${i+1}. ${x.task}`,width);
+  const info=doc.splitTextToSize(`Member: ${x.memberName||"-"} | Member ID: ${x.memberId||"-"} | UAN: ${x.uan||"-"}`,width);
+  const rem=doc.splitTextToSize(`Status: ${x.status} | Remarks: ${x.remark||"-"}`,width);
+  const need=(lines.length+info.length+rem.length)*5+8;
+  if(y+need>280){doc.addPage();y=18;}
+  doc.setFont(undefined,"bold");doc.text(lines,margin,y);y+=lines.length*5;
+  doc.setFont(undefined,"normal");doc.text(info,margin,y);y+=info.length*5;
+  doc.text(rem,margin,y);y+=rem.length*5+5;doc.line(margin,y,198,y);y+=5;
+ });
+ doc.save("Shubham_Work_Diary_"+date+".pdf");
+}
+function exportDiaryBackup(){
+ const blob=new Blob([JSON.stringify(diary,null,2)],{type:"application/json"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download="Shubham_Work_Diary_Backup.json";a.click();URL.revokeObjectURL(a.href);
+}
+function restoreDiaryBackup(event){
+ const file=event.target.files[0];if(!file)return;const r=new FileReader();
+ r.onload=e=>{try{const p=JSON.parse(e.target.result);if(!Array.isArray(p))throw 0;diary=p.map(normalizeEntry);saveDiary();render();alert("Diary restored successfully.");}catch(err){alert("Invalid backup file.");}event.target.value="";};r.readAsText(file);
+}
+(function init(){const t=new Date().toISOString().slice(0,10);document.getElementById("from").value="";document.getElementById("to").value=t;document.getElementById("pdfDate").value=t;document.getElementById("edate").value=t;render();})();
 </script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}</script>
 </body>
 </html>
