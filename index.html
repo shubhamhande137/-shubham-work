@@ -34,6 +34,7 @@ textarea{width:100%;min-height:100px;resize:vertical}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 .uploadbox{border:2px dashed #9aa9b8;border-radius:8px;padding:18px;background:#f8fafc;margin-top:12px}
 .memberlist{max-height:320px;overflow-y:auto;border:1px solid #d5dbe1;border-radius:6px;margin-top:12px}
@@ -105,10 +106,10 @@ textarea{width:100%;min-height:100px;resize:vertical}
   </div>
   <div class="uploadbox">
    <b>Upload Ledger</b><br>
-   <span class="small">Upload Excel (.xlsx/.xls) or CSV. The module reads the rows and extracts Member ID, UAN, Name and Establishment where available.</span>
+   <span class="small">Upload Excel (.xlsx/.xls), CSV, or PDF. For PDF, the module extracts selectable text and identifies Member ID, UAN, Name and Establishment where available.</span>
    <div style="margin-top:10px">
     <button type="button" onclick="document.getElementById('ledgerFile').click()">📁 Browse Ledger File</button>
-   <input type="file" id="ledgerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="document.getElementById('ledgerFileName').textContent=this.files.length?this.files[0].name:'No file selected'"> <span id="ledgerFileName" class="small">No file selected</span>
+   <input type="file" id="ledgerFile" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none" onchange="document.getElementById('ledgerFileName').textContent=this.files.length?this.files[0].name:'No file selected'"> <span id="ledgerFileName" class="small">No file selected</span>
     <button onclick="processLedger()">Fetch Ledger Data</button>
    </div>
    <div id="uploadStatus" class="small" style="margin-top:8px"></div>
@@ -171,10 +172,11 @@ textarea{width:100%;min-height:100px;resize:vertical}
  <div class="card" id="fetchResult" style="display:none">
   <div class="title">Fetched Work Details</div>
   <div id="fetchMemberDetails" class="info"></div>
+  <div id="fetchDeleteArea" style="margin-top:12px"></div>
   <div class="tablewrap" style="margin-top:12px">
    <table style="min-width:850px">
     <thead>
-     <tr><th>Sr. No.</th><th>Date</th><th>Member ID</th><th>UAN</th><th>Name</th><th>Work Done</th><th>Status / Remarks</th></tr>
+     <tr><th>Sr. No.</th><th>Date</th><th>Member ID</th><th>UAN</th><th>Name</th><th>Work Done</th><th>Status / Remarks</th><th class="no-print">Action</th></tr>
     </thead>
     <tbody id="fetchRows"></tbody>
    </table>
@@ -282,6 +284,11 @@ function processLedger(){
  if(!file){alert("Please select a ledger file.");return}
  const status=document.getElementById("uploadStatus");
  status.textContent="Reading ledger...";
+ const name=file.name.toLowerCase();
+ if(name.endsWith(".pdf") || file.type === "application/pdf"){
+   processPdfLedger(file);
+   return;
+ }
  const reader=new FileReader();
  reader.onload=e=>{
   try{
@@ -305,6 +312,84 @@ function processLedger(){
   }
  };
  reader.readAsArrayBuffer(file);
+}
+
+async function processPdfLedger(file){
+ const status=document.getElementById("uploadStatus");
+ try{
+   if(!window.pdfjsLib){ throw new Error("PDF library not loaded"); }
+   status.textContent="Reading PDF...";
+   const buffer=await file.arrayBuffer();
+   const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+   let pages=[];
+   for(let pageNo=1; pageNo<=pdf.numPages; pageNo++){
+     status.textContent=`Reading PDF page ${pageNo} of ${pdf.numPages}...`;
+     const page=await pdf.getPage(pageNo);
+     const content=await page.getTextContent();
+     const items=content.items||[];
+     const lines={};
+     items.forEach(item=>{
+       const y=Math.round(item.transform[5]);
+       const key=Object.keys(lines).find(k=>Math.abs(Number(k)-y)<=3)||String(y);
+       lines[key]=(lines[key]?lines[key]+" ":"")+String(item.str||"").trim();
+     });
+     Object.keys(lines).sort((a,b)=>Number(b)-Number(a)).forEach(k=>{
+       const line=lines[k].replace(/\s+/g," ").trim();
+       if(line) pages.push(line);
+     });
+   }
+   const text=pages.join("\n");
+   if(!text.trim()){
+     status.textContent="This PDF appears to be scanned/image-only. Text could not be extracted.";
+     alert("This PDF appears to be scanned/image-only. Please use a text/selectable PDF or Excel ledger. OCR can be added separately.");
+     return;
+   }
+   ledgerMembers=parsePdfMembers(text);
+   selectedMemberIndexes.clear();
+   renderMembers();
+   document.getElementById("memberArea").style.display=ledgerMembers.length?"block":"none";
+   status.textContent=`Loaded ${ledgerMembers.length} member row(s) from PDF ${file.name}.`;
+   if(!ledgerMembers.length){
+     status.textContent="PDF text was read, but no recognizable Member ID/UAN/Name rows were found.";
+   }
+ }catch(err){
+   console.error(err);
+   status.textContent="Could not read the PDF. Please check that it is a valid text/selectable PDF.";
+ }
+}
+
+function parsePdfMembers(text){
+ const lines=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+ const out=[];
+ const seen=new Set();
+ const uanRe=/\b\d{12}\b/g;
+ const midRe=/\b[A-Z]{2,5}[A-Z0-9]{3,}\d{4,}\b/g;
+ for(let i=0;i<lines.length;i++){
+   const line=lines[i];
+   const uans=line.match(uanRe)||[];
+   const mids=line.match(midRe)||[];
+   if(!uans.length && !mids.length) continue;
+   const uan=uans[0]||"";
+   const memberId=mids.find(x=>!/^\d+$/.test(x))||"";
+   const combined=[lines[i-1]||"",line,lines[i+1]||""].join(" ");
+   let name="";
+   const nm=combined.match(/(?:member\s*name|name)\s*[:\-]?\s*([A-Za-z][A-Za-z .,'-]{2,60})/i);
+   if(nm) name=nm[1].trim();
+   let establishment="";
+   const em=combined.match(/(?:establishment(?:\s*name)?|employer)\s*[:\-]?\s*([^|]+?)(?=\s+(?:UAN|Member|Name)\s*[:\-]|$)/i);
+   if(em) establishment=em[1].trim();
+   const key=(memberId||"")+"|"+(uan||"")+"|"+name;
+   if((memberId||uan||name) && !seen.has(key)){
+     seen.add(key);
+     out.push({sourceRow:i+1,memberId,uan,name,establishment,raw:{source:"PDF",text:line}});
+   }
+ }
+ // Fallback: if the PDF has UANs but no recognizable labels, make one row per UAN.
+ if(!out.length){
+   const all=[...text.matchAll(/\b\d{12}\b/g)].map(m=>m[0]);
+   [...new Set(all)].forEach((u,i)=>out.push({sourceRow:i+1,memberId:"",uan:u,name:"",establishment:"",raw:{source:"PDF"}}));
+ }
+ return out;
 }
 function renderMembers(){
  const list=document.getElementById("memberList");
@@ -460,19 +545,51 @@ function fetchWork(){
  <b>UAN:</b> ${escapeHtml(uan||"-")} &nbsp; | &nbsp;
  <b>Establishment:</b> ${escapeHtml(establishment||"-")}`;
 
+ const deleteArea=document.getElementById("fetchDeleteArea");
+ if(type==="uan"){
+   deleteArea.innerHTML=`<button class="danger" onclick="deleteAllWorkByUAN()">Delete All Work for this UAN on this Date</button>
+   <span class="small" style="margin-left:8px">This will remove all fetched work entries for the selected UAN and date.</span>`;
+ }else{
+   deleteArea.innerHTML="";
+ }
+
  matches.forEach((x,i)=>{
    const tr=document.createElement("tr");
    tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td>
    <td>${escapeHtml(memberId||"-")}</td><td>${escapeHtml(uan||"-")}</td>
    <td>${escapeHtml(name||"-")}</td><td>${escapeHtml(x.task)}</td>
-   <td><span class="status ${x.status.toLowerCase()}">${escapeHtml(x.status)}</span><br>${escapeHtml(x.remark||"")}</td>`;
+   <td><span class="status ${x.status.toLowerCase()}">${escapeHtml(x.status)}</span><br>${escapeHtml(x.remark||"")}</td>
+   <td class="no-print"><button class="danger" onclick="deleteFetchedWork(${diary.indexOf(x)})">Delete</button></td>`;
    body.appendChild(tr);
  });
+}
+function deleteFetchedWork(index){
+ if(index<0 || index>=diary.length) return;
+ const x=diary[index];
+ if(confirm(`Delete this work entry for UAN ${extractMemberField(x.task,"UAN")||"-"}?`)){
+   diary.splice(index,1);
+   render();
+   fetchWork();
+ }
+}
+function deleteAllWorkByUAN(){
+ const date=document.getElementById("fetchDate").value;
+ const uan=document.getElementById("fetchNumber").value.trim();
+ if(!date||!uan) return;
+ const before=diary.length;
+ const matches=diary.filter(x=>x.date===date && extractMemberField(x.task,"UAN").trim().toLowerCase()===uan.toLowerCase());
+ if(!matches.length){alert("No work found for this UAN on the selected date.");return}
+ if(!confirm(`Delete ALL ${matches.length} work entr${matches.length===1?"y":"ies"} for UAN ${uan} on ${fmtDate(date)}?`)) return;
+ diary=diary.filter(x=>!(x.date===date && extractMemberField(x.task,"UAN").trim().toLowerCase()===uan.toLowerCase()));
+ render();
+ fetchWork();
+ alert(`${before-diary.length} work entr${before-diary.length===1?"y":"ies"} deleted.`);
 }
 function clearFetch(){
  document.getElementById("fetchNumber").value="";
  document.getElementById("fetchResult").style.display="none";
  document.getElementById("fetchRows").innerHTML="";
+ document.getElementById("fetchDeleteArea").innerHTML="";
 }
 
 function showTab(id,el){
