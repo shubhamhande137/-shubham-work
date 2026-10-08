@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shubham Work Diary Module</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6f9;color:#263238}
+.topbar{background:#174a92;color:#fff;padding:15px 24px;font-size:21px;font-weight:700}
+.wrap{max-width:1450px;margin:auto;padding:18px}
+.tabs{display:flex;gap:3px;border-bottom:1px solid #bbb;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;position:relative;z-index:50;touch-action:pan-x}
+.tab{padding:13px 25px;background:#dce2e9;border-radius:11px 11px 0 0;font-weight:700;cursor:pointer;flex:0 0 auto;min-width:150px;text-align:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;z-index:51}
+.tab.active{background:#fff;color:#174a92;border:1px solid #bbb;border-bottom:none}
+.tab[data-tab="completedTab"]{background:#e8f5e9;color:#2e7d32}
+.tab[data-tab="completedTab"].active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+.tab[data-tab="pendingTab"]{background:#ffebee;color:#c62828}
+.tab[data-tab="pendingTab"].active{background:#c62828;color:#fff;border-color:#c62828}
+.card{background:#fff;border:1px solid #d8dde3;border-radius:8px;padding:17px;margin-top:14px;box-shadow:0 1px 4px #ddd}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input,select,textarea,button{font:inherit;border:1px solid #b9c1ca;border-radius:5px;padding:9px 11px}
+input,select{height:40px} button{background:#1758ad;color:#fff;border:0;font-weight:700;cursor:pointer}
+button.gray{background:#607d8b}.danger{background:#c62828}
+.title{border-left:6px solid #174a92;padding:9px 12px;color:#174a92;font-size:19px;font-weight:700;margin-bottom:14px}
+.member{display:grid;grid-template-columns:150px 1fr 150px 1fr;border:1px solid #ddd}
+.member div{padding:11px;border-bottom:1px solid #ddd}.label{background:#eef1f4;color:#174a92;font-weight:700}
+.stats{display:flex;gap:12px;flex-wrap:wrap}.stat{min-width:180px;background:#f6f8fa;border:1px solid #d8dde3;border-radius:7px;padding:12px}.stat b{display:block;font-size:20px;color:#174a92;margin-top:4px}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1000px;font-size:13px}
+th{background:#e8edf3;color:#173e73;border:1px solid #c9d0d7;padding:9px;white-space:nowrap}td{border:1px solid #d3d8dd;padding:8px;vertical-align:top}td:nth-child(1),td:nth-child(2){text-align:center;white-space:nowrap}
+.status{font-weight:700}.done{color:#2e7d32}.pending{color:#ef6c00}.forwarded{color:#1565c0}.approval{color:#1565c0}
+.formgrid{display:grid;grid-template-columns:160px 1fr 160px 1fr;gap:10px;align-items:center}.formgrid label{font-weight:700;color:#174a92}
+textarea{width:100%;min-height:100px;resize:vertical}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.hidden{display:none}
+.small{font-size:12px;color:#607d8b}
+
+.step-tab{border:1px solid #b8c4d1;background:#eef2f6;color:#174a92;border-radius:7px;padding:9px 14px;font-weight:700;cursor:pointer}.step-tab.active{background:#174a92;color:#fff}.step-tab:disabled{opacity:.55;cursor:not-allowed}.step-tab:not(:disabled):hover{background:#dce8f7}
+@media(max-width:800px){.member,.formgrid{grid-template-columns:1fr}.member .label{border-top:1px solid #ddd}}
+@media print{.topbar,.tabs,.controls,.actions,.no-print{display:none!important}.card{box-shadow:none;border:0}.wrap{padding:0}body{background:#fff}}
+.tab[data-tab="pendingTab"]{background:#dc3545!important;color:#fff!important}.tab[data-tab="pendingTab"].active{background:#b02a37!important;color:#fff!important}</style>
+
+<script>
+// OFFLINE MODE: PDF extraction is built into this single HTML file. No CDN,
+// PDF.js or Tesseract download is required for text-based EPFO ledger PDFs.
+window.__pdfReadyPromise=Promise.resolve(false);
+window.__ocrReadyPromise=Promise.resolve(false);
+function ensurePdfJs(){ return Promise.reject(new Error("Offline mode: PDF.js is not required.")); }
+function ensureTesseract(){ return Promise.reject(new Error("Offline mode: OCR library is not installed.")); }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+.uploadbox{border:2px dashed #9aa9b8;border-radius:8px;padding:18px;background:#f8fafc;margin-top:12px}
+.memberlist{max-height:320px;overflow-y:auto;border:1px solid #d5dbe1;border-radius:6px;margin-top:12px}
+.memberrow{display:grid;grid-template-columns:50px 1fr 1fr 1fr 1fr;gap:8px;padding:9px;border-bottom:1px solid #e1e5e8;align-items:center;font-size:13px}
+.memberrow.head{background:#e8edf3;color:#174a92;font-weight:700;position:sticky;top:0}
+.memberrow:hover{background:#f2f7ff}
+.work-picker{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.work-options{border:1px solid #d4dae0;border-radius:7px;max-height:300px;overflow-y:auto;background:#fff}
+.work-option{padding:11px 13px;border-bottom:1px solid #e6e9ec;cursor:pointer}
+.work-option:hover,.work-option.selected{background:#e8f0ff;color:#174a92;font-weight:700}
+.member-chip{display:inline-block;background:#eaf2ff;color:#174a92;border:1px solid #c7d9f5;padding:5px 9px;border-radius:15px;margin:3px;font-size:12px}
+@media(max-width:800px){.memberrow{grid-template-columns:35px 1fr 1fr}.memberrow span:nth-child(4),.memberrow span:nth-child(5){display:none}.work-picker{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar">EPFO — Work Diary Management Module</div>
+<div class="wrap">
+
+<div class="tabs">
+  <div class="tab active" data-tab="searchTab">Search Work</div>
+  <div class="tab" data-tab="entry">Update Today's Work @PDF</div>
+  <div class="tab" data-tab="completedTab">Completed Work</div>
+  <div class="tab" data-tab="pendingTab">Pending Work</div>
+</div>
+
+<section id="searchTab">
+  <div class="card">
+    <div class="title">Search Specific Work</div>
+    <div class="controls">
+      <label><b>Date:</b></label><input type="date" id="searchWorkDate">
+      <label><b>UAN:</b></label><input id="searchWorkUan" placeholder="Enter UAN">
+      <label><b>Work:</b></label><input id="searchWorkTask" placeholder="e.g. Submission Done">
+      <button onclick="searchSpecificWork()">Search</button>
+      <button class="gray" onclick="clearSpecificSearch()">Clear</button>
+    </div>
+    <div class="small" style="margin-top:8px">Search by date, UAN, or both. Work name is optional.</div>
+  </div>
+  <div class="card" id="searchResultCard" style="display:none">
+    <div class="title">Search Results</div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Sr. No.</th><th>Date</th><th>Member Name</th><th>Member ID</th><th>UAN</th><th>Work</th><th>Status</th><th>Remarks</th><th>Delete</th></tr></thead>
+      <tbody id="searchResultRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="diary" class="hidden">
+ <div class="card">
+  <div class="controls">
+   <b>Diary period (unlimited):</b>
+   <input type="date" id="from">
+   <span>to</span>
+   <input type="date" id="to">
+   <input id="search" placeholder="Search work / claim / member..." style="min-width:250px" oninput="render()">
+   <select id="filterStatus" onchange="render()">
+    <option value="">All Status</option><option>Completed</option><option>Pending</option><option>Forwarded for Approval</option>
+   </select>
+   <button onclick="window.print()">Print Diary</button>
+   <button class="gray" onclick="exportDiaryBackup()">Backup Data</button>
+   <button class="gray" onclick="document.getElementById('backupFile').click()">Restore Backup</button>
+   <input type="file" id="backupFile" accept=".json" style="display:none" onchange="restoreDiaryBackup(event)">
+   <input type="date" id="pdfDate" title="Select date for PDF">
+   <button onclick="generateDatePdf()">Generate PDF by Date</button>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="title">Master Work Diary — Shubham</div>
+  <div class="stats">
+   <div class="stat">Total Entries<b id="total">0</b></div>
+   <div class="stat">Completed<b id="completed">0</b></div>
+   <div class="stat">Pending<b id="pending">0</b></div>
+   <div class="stat">Forwarded<b id="forwarded">0</b></div>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="tablewrap">
+   <table>
+    <thead><tr><th>Sr. No.</th><th>Day / Date</th><th>Member Name</th><th>Member ID</th><th>UAN</th><th>Work / Task</th><th>Status / Remarks</th><th class="no-print">Action</th></tr></thead>
+    <tbody id="rows"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
+
+<section id="ledger" class="hidden">
+ <div class="card">
+  <div class="title">Insert Ledger / Fetch Member Details</div>
+  <div class="controls">
+   <label><b>Date:</b></label>
+   <input type="date" id="ledgerDate" value="2026-10-07">
+  </div>
+  <div class="uploadbox">
+   <b>Upload Ledger</b><br>
+   <span class="small">Upload the ledger PDF. As soon as the PDF is selected, the system automatically extracts Member ID, UAN, Member Name and Establishment, fills the member details, and then asks what work you completed.</span>
+   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+    <input type="file" id="ledgerFile" accept=".xlsx,.xls,.csv">
+    <button onclick="processLedger()">Fetch Excel/CSV Ledger</button>
+   </div>
+   <div style="margin-top:12px">
+    <b>Or upload Ledger PDF</b><br>
+    <input type="file" id="ledgerPdfFile" accept=".pdf,application/pdf" onchange="processLedgerPdf()">
+    <span class="small">PDF is processed automatically after selection.</span>
+   </div>
+   <div id="uploadStatus" class="small" style="margin-top:8px">No ledger selected.</div>
+  </div>
+  <div id="memberArea" style="display:none">
+   <div style="margin-top:14px;font-weight:700;color:#174a92">Select members to add to this day's work</div>
+   <div class="memberlist" id="memberList"></div>
+   <div style="margin-top:10px">
+    <button onclick="selectAllMembers()">Select All</button>
+    <button class="gray" onclick="clearMemberSelection()">Clear Selection</button>
+    <button onclick="moveSelectedToWork()">Add Selected Members → Today's Work</button>
+   </div>
+  </div>
+ </div>
+
+ <div class="card" id="pdfLedgerWorkCard" style="display:none">
+   <div class="title">Ledger Members — Select Work Done</div>
+   <div class="small">Member details were extracted from the uploaded ledger PDF. Select the member(s), then select the work you completed.</div>
+   <div class="memberlist" id="pdfLedgerMemberList" style="margin-top:12px"></div>
+   <div style="margin-top:14px">
+    <b style="color:#174a92">What work did you do for these member(s)?</b><div class="small">Select the work/status. For example: Submission Done or Forwarded to Next Level in System.</div>
+    <div class="work-options" id="pdfLedgerWorkOptions" style="margin-top:8px"></div>
+   </div>
+   <div class="formgrid" style="margin-top:14px">
+    <label>Date</label><input type="date" id="pdfLedgerWorkDate">
+    <label>Status</label>
+    <select id="pdfLedgerStatus"><option>Completed</option><option>Pending</option><option>Forwarded for Approval</option></select>
+   </div>
+   <div style="margin-top:14px">
+    <label style="font-weight:700;color:#174a92">Remarks (optional)</label>
+    <textarea id="pdfLedgerRemark" placeholder="Enter remarks / outcome..."></textarea>
+   </div>
+   <div class="actions">
+    <button onclick="savePdfLedgerWork()">Save Work for Selected Members</button>
+    <button class="gray" onclick="selectAllPdfLedgerMembers()">Select All</button>
+    <button class="gray" onclick="clearPdfLedgerMembers()">Clear Selection</button>
+   </div>
+  </div>
+
+  <div class="card" id="todayWorkCard" style="display:none">
+  <div class="title">What work did you do?</div>
+  <div class="small">First select a work type from the scroll list. The selected member(s) will be added to the selected date.</div>
+  <div class="work-picker">
+   <div>
+    <b style="color:#174a92">Work Type</b>
+    <div class="work-options" id="workOptions"></div>
+   </div>
+   <div>
+    <b style="color:#174a92">Selected Members</b>
+    <div id="selectedMembers" style="padding:8px;border:1px solid #d4dae0;border-radius:7px;min-height:100px;background:#fafafa"></div>
+   </div>
+  </div>
+  <div style="margin-top:14px">
+   <label style="font-weight:700;color:#174a92">Additional remarks (optional)</label>
+   <textarea id="bulkRemark" placeholder="e.g. documents verified, submission prepared, claim forwarded..."></textarea>
+  </div>
+  <div class="actions">
+   <button onclick="addSelectedWork()">Add Work to This Day</button>
+  </div>
+ </div>
+</section>
+
+
+<section id="fetch" class="hidden">
+ <div class="card">
+  <div class="title">Search Work by Member ID / UAN</div>
+  <div class="controls">
+   <label><b>Date (optional):</b></label>
+   <input type="date" id="fetchDate">
+   <label><b>Search by:</b></label>
+   <select id="fetchType">
+    <option value="memberId">Member ID</option>
+    <option value="uan">UAN</option>
+   </select>
+   <input id="fetchNumber" placeholder="Enter Member ID / UAN" style="min-width:280px">
+   <button onclick="fetchWork()">Fetch Data</button>
+   <button class="gray" onclick="clearFetch()">Clear</button>
+  </div>
+  <div class="small" style="margin-top:10px">
+   Select <b>Member ID</b> or <b>UAN</b> and enter the number. Leave the date blank to search all recorded dates, or select a date to narrow the result.
+  </div>
+ </div>
+
+ <div class="card" id="fetchResult" style="display:none">
+  <div class="title">Fetched Work Details</div>
+  <div id="fetchMemberDetails" class="info"></div>
+  <div class="tablewrap" style="margin-top:12px">
+   <table style="min-width:850px">
+    <thead>
+     <tr><th>Sr. No.</th><th>Date</th><th>Member ID</th><th>UAN</th><th>Name</th><th>Work Done</th><th>Status / Remarks</th></tr>
+    </thead>
+    <tbody id="fetchRows"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
+
+<section id="pdfwork" class="hidden">
+  <div class="card">
+    <div class="title">Upload PDF → Fetch Members → Select Work</div>
+    <div class="small">Upload the member PDF first. The module will extract Member ID, UAN and Name where they are present in the PDF. Then select the work you completed and save. You do not need to enter member details manually.</div>
+
+    <div class="uploadbox">
+      <b>1. Upload Member PDF</b><br>
+      <input type="file" id="workPdf" accept="application/pdf,.pdf">
+      <div id="pdfWorkStatus" class="small" style="margin-top:8px">No PDF selected.</div>
+    </div>
+
+    <div id="pdfWorkArea" style="display:none;margin-top:14px">
+      <div class="memberlist" id="pdfMemberList"></div>
+
+      <div style="margin-top:14px">
+        <label style="font-weight:700;color:#174a92">2. What work did you do?</label>
+        <div class="work-options" id="pdfWorkOptions" style="margin-top:8px"></div>
+      </div>
+
+      <div class="formgrid" style="margin-top:14px">
+        <label>Date</label><input type="date" id="pdfWorkDate">
+        <label>Status</label>
+        <select id="pdfWorkStatusSelect"><option>Completed</option><option>Pending</option><option>Forwarded for Approval</option></select>
+      </div>
+
+      <div style="margin-top:14px">
+        <label style="font-weight:700;color:#174a92">Remarks (optional)</label>
+        <textarea id="pdfWorkRemark" placeholder="Enter remarks / outcome..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button onclick="savePdfWork()">Save Work for Selected Member(s)</button>
+        <button class="gray" onclick="selectAllPdfMembers()">Select All Members</button>
+        <button class="gray" onclick="clearPdfMembers()">Clear Selection</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="entry" class="hidden">
+ <div class="card">
+  <div class="title">Update Today's Work @PDF</div>
+  <div class="step-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <button id="pdfStepUpload" class="step-tab active" onclick="showPdfStep('upload')">1. Upload PDF</button>
+    <button id="pdfStepExtracted" class="step-tab" disabled onclick="showPdfStep('extracted')">2. Extracted Data</button>
+  </div>
+  <div id="pdfUploadStep" style="margin-top:14px">
+   <label style="font-weight:700;color:#174a92">Upload PDF — Member details will be extracted automatically (OCR for scanned PDFs)</label><br>
+   <input type="file" id="epdf" accept=".pdf,application/pdf" onchange="autoFillFromAttachedPdf()">
+   <div id="currentPdf" class="small" style="margin-top:6px">No PDF attached</div><div id="pdfAutoStatus" class="small" style="margin-top:6px"></div><div class="small" style="margin-top:5px">After extraction, open <b>2. Extracted Data</b> to review the member details before saving.</div>
+  </div>
+  <div id="pdfExtractedStep" style="display:none;margin-top:14px">
+   <div class="small" style="margin-bottom:10px;color:#174a92"><b>Review extracted member data below before selecting work.</b></div>
+
+  <div class="formgrid">
+   <label>Date</label><input type="date" id="edate">
+   <label>Status</label>
+   <select id="estatus"><option>Completed</option><option>Pending</option><option>Forwarded for Approval</option></select>
+   <label>Member Name</label><input id="ememberName" placeholder="Member name">
+   <label>Member ID</label><input id="ememberId" placeholder="Member ID">
+   <label>UAN</label><input id="euan" placeholder="UAN">
+  </div>
+  <div style="margin-top:14px"><label style="font-weight:700;color:#174a92">Work / Task</label>
+   <select id="etask" size="5" style="width:100%;height:auto;min-height:210px">
+    <option value="">Select work done</option>
+    <option>Submission Done</option>
+    <option>Forwarded to Next Level in System</option>
+    <option>Claim Process</option>
+    <option>PMO Reply Given</option>
+    <option>EPGMIS Reply Given</option>
+    <option>Death Case / Form-10D Process</option>
+    <option>F-20 Process</option>
+    <option>F-5IF Process</option>
+    <option>Grievance Reply</option>
+    <option>RTI Reply</option>
+    <option>EPS Service Verification</option>
+    <option>EPS Service Add</option>
+    <option>Form-10C Process</option>
+    <option>Form-19 Process</option>
+    <option>Form-10D Process</option>
+    <option>Form-20 Process</option>
+    <option>Other Claim Processing</option>
+    <option>Other</option>
+   </select>
+  </div>
+  <div style="margin-top:14px"><label style="font-weight:700;color:#174a92">Status / Remarks</label>
+   <textarea id="eremark" placeholder="Enter remarks / outcome..."></textarea>
+  </div>
+  
+  <div class="small" style="margin-top:10px">The module automatically prevents duplicate entries for the same date/task combination.</div>
+  </div>
+ </div>
+</section>
+
+
+<section id="completedTab" class="hidden">
+  <div class="card">
+    <div class="title">Completed Work</div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Sr. No.</th><th>Date</th><th>Member Name</th><th>Member ID</th><th>UAN</th><th>Work</th><th>Remarks</th><th>Delete</th></tr></thead>
+      <tbody id="completedRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="pendingTab" class="hidden">
+  <div class="card">
+    <div class="title">Pending Work</div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Sr. No.</th><th>Date</th><th>Member Name</th><th>Member ID</th><th>UAN</th><th>Work</th><th>Remarks</th><th>Delete</th></tr></thead>
+      <tbody id="pendingRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="summary" class="hidden">
+ <div class="card">
+  <div class="title">Work Summary</div>
+  <div id="summaryText"></div>
+ </div>
+</section>
+
+</div>
+
+<script>
+const STORAGE_KEY = "shubham_work_diary_v3";
+
+window._autoPdfName=""; window._autoPdfData="";
+
+let diary = [
+ {date:"2026-09-15",task:"Prepared and examined EPFO claim/submission work and routine settlement cases.",status:"Completed",remark:"Work processed and records updated.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-09-16",task:"Parul Jhaver pension-related submission forwarded to Delhi office.",status:"Forwarded",remark:"Reply of grievance No. MOLBR/E/2026/0190803 prepared/given.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-05",task:"Claim process; PMO reply given; EPGMIS reply given.",status:"Completed",remark:"Replies and claim-related work completed.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-06",task:"Examined settlement submission for Form-20, Form-10D and Form-5IF in respect of late Shri Sukanta Ghosh under A/c Gr. 3/2; verified death and supporting documents.",status:"Completed",remark:"Member/death details and supporting documents examined.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""},
+ {date:"2026-10-07",task:"Processed 2 death cases in Form-10D / related death-case work.",status:"Completed",remark:"Two death cases processed today.",memberName:"",memberId:"",uan:"",pdfName:"",pdfData:""}
+];
+
+let editIndex=-1, ledgerMembers=[], selectedMemberIndexes=new Set(), selectedWorkType="";
+
+const workTypes = [
+ "Death claim review and submission","F-20 process","F-5IF process","F-10D process",
+ "Ac-1 to Ac-10","Ac-10 to Ac-1","EPS service add","F-13 amount reaccredited",
+ "Other claim return amount added","Special Vdr-other cases","Grievance Reply","RTI reply",
+ "Submission Done","Claim Process","Submission Process","Process Completed"
+];
+
+function escapeHtml(s){
+ s=String(s??"");
+ return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function fmtDate(s){
+ const d=new Date(s+"T00:00:00");
+ return d.toLocaleDateString("en-IN",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function day(s){
+ return new Date(s+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long"});
+}
+function normalizeEntry(x){
+ return {...x,memberName:x.memberName||"",memberId:x.memberId||"",uan:x.uan||"",pdfName:x.pdfName||"",pdfData:x.pdfData||""};
+}
+function saveDiary(){
+ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(diary));}
+ catch(e){alert("Could not save this PDF in browser storage. The PDF may be too large or browser storage may be full. Try a smaller PDF, or use Backup Data.");}
+}
+function loadDiary(){
+ try{
+  const saved=localStorage.getItem(STORAGE_KEY);
+  if(saved){const p=JSON.parse(saved);if(Array.isArray(p)) diary=p.map(normalizeEntry);}
+ }catch(e){console.warn(e);}
+}
+loadDiary();
+
+
+function matchesWork(x,date,uan,task,status){
+  return (!date||x.date===date)&&
+         (!uan||String(x.uan||"").toLowerCase()===uan.toLowerCase())&&
+         (!task||String(x.task||"").toLowerCase().includes(task.toLowerCase()))&&
+         (!status||x.status===status);
+}
+function searchSpecificWork(){
+  const date=document.getElementById("searchWorkDate").value;
+  const uan=document.getElementById("searchWorkUan").value.trim();
+  const task=document.getElementById("searchWorkTask").value.trim();
+  const rows=document.getElementById("searchResultRows");
+  rows.innerHTML="";
+  const found=diary.filter(x=>matchesWork(x,date,uan,task,""));
+  found.forEach((x,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td><td>${escapeHtml(x.memberName||"-")}</td><td>${escapeHtml(x.memberId||"-")}</td><td>${escapeHtml(x.uan||"-")}</td><td>${escapeHtml(x.task)}</td><td>${escapeHtml(x.status)}</td><td>${escapeHtml(x.remark||"")}</td>`;
+    rows.appendChild(tr);
+  });
+  document.getElementById("searchResultCard").style.display="block";
+  if(!found.length) rows.innerHTML='<tr><td colspan="9">No matching work found.</td></tr>';
+}
+function clearSpecificSearch(){
+  document.getElementById("searchWorkDate").value="";
+  document.getElementById("searchWorkUan").value="";
+  document.getElementById("searchWorkTask").value="";
+  document.getElementById("searchResultCard").style.display="none";
+}
+function renderStatusTable(status,targetId){
+  const body=document.getElementById(targetId); if(!body)return;
+  body.innerHTML="";
+  const rows=diary.map((x,index)=>({x,index})).filter(o=>o.x.status===status).sort((a,b)=>String(a.x.date||"").localeCompare(String(b.x.date||"")));
+  rows.forEach((o,i)=>{
+    const x=o.x, idx=o.index;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td><td>${escapeHtml(x.memberName||"-")}</td><td>${escapeHtml(x.memberId||"-")}</td><td>${escapeHtml(x.uan||"-")}</td><td>${escapeHtml(x.task||x.work||"")}</td><td>${escapeHtml(x.remark||"")}</td><td><button type="button" class="danger" data-delete-index="${idx}">Delete</button></td>`;
+    const btn=tr.querySelector('[data-delete-index]');
+    btn.addEventListener('click',function(e){
+      e.preventDefault(); e.stopPropagation();
+      deleteWorkEntry(idx);
+    });
+    body.appendChild(tr);
+  });
+  if(!rows.length) body.innerHTML=`<tr><td colspan="8">No ${status.toLowerCase()} work found.</td></tr>`;
+}
+
+
+function deleteCurrentFormEntry(){
+ const date=(document.getElementById("edate")?.value||"").trim();
+ const memberId=(document.getElementById("ememberId")?.value||"").trim();
+ const uan=(document.getElementById("euan")?.value||"").trim();
+ const name=(document.getElementById("ememberName")?.value||"").trim();
+ const task=(document.getElementById("etask")?.value||"").trim();
+ if(!date || (!memberId && !uan) || !task){
+  alert("Please enter/select Date, Member ID or UAN, and Work / Task for the saved entry you want to delete.");
+  return;
+ }
+ const matches=[];
+ diary.forEach((x,i)=>{
+  const sameDate=String(x.date||"")===date;
+  const sameTask=String(x.work||x.task||"")===task;
+  const sameMember=memberId ? String(x.memberId||"").trim()===memberId : true;
+  const sameUan=uan ? String(x.uan||"").trim()===uan : true;
+  if(sameDate && sameTask && sameMember && sameUan) matches.push(i);
+ });
+ if(!matches.length){ alert("No matching saved work entry found."); return; }
+ const label=name || memberId || uan;
+ if(!confirm("Delete "+matches.length+" saved work entr"+(matches.length===1?"y":"ies")+" for "+label+"?")) return;
+ matches.sort((a,b)=>b-a).forEach(i=>diary.splice(i,1));
+ saveDiary();
+ render();
+ alert("Saved work deleted successfully.");
+}
+
+function deleteWorkEntry(index){
+  if(index<0 || index>=diary.length) return;
+  const x=diary[index];
+  const label=(x.memberName||x.memberId||x.uan||"this entry");
+  if(!confirm("Delete this work entry for "+label+"?")) return;
+  diary.splice(index,1);
+  saveDiary();
+  render();
+  if(typeof renderStatusTable==="function"){
+    renderStatusTable("Completed","completedRows");
+    renderStatusTable("Pending","pendingRows");
+  }
+  const card=document.getElementById("searchResultCard");
+  if(card && card.style.display!=="none" && typeof searchSpecificWork==="function"){
+    searchSpecificWork();
+  }
+}
+function render(){
+ const q=(document.getElementById("search").value||"").toLowerCase();
+ const fs=document.getElementById("filterStatus").value;
+ const from=document.getElementById("from").value,to=document.getElementById("to").value;
+ const filtered=diary.map((x,i)=>({...normalizeEntry(x),i})).filter(x=>
+  (!from||x.date>=from)&&(!to||x.date<=to)&&(!fs||x.status===fs)&&
+  (!q||[x.task,x.remark,x.memberName,x.memberId,x.uan,x.pdfName].join(" ").toLowerCase().includes(q))
+ ).sort((a,b)=>a.date.localeCompare(b.date));
+ const tb=document.getElementById("rows"); tb.innerHTML="";
+ filtered.forEach((x,n)=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${n+1}</td>
+   <td><b>${day(x.date)}</b><br>${fmtDate(x.date)}</td>
+   <td>${escapeHtml(x.memberName||"-")}</td>
+   <td>${escapeHtml(x.memberId||"-")}</td>
+   <td>${escapeHtml(x.uan||"-")}</td>
+   <td>${escapeHtml(x.task)}</td>
+   <td><span class="status ${String(x.status).toLowerCase()}">${escapeHtml(x.status)}</span><br>${escapeHtml(x.remark||"")}${x.pdfName?`<br><span class="small">📎 ${escapeHtml(x.pdfName)}</span>`:""}</td>
+   <td class="no-print"><button onclick="editEntry(${x.i})">Edit</button> ${x.pdfData?`<button class="gray" onclick="openPdf(${x.i})">PDF</button>`:""} <button class="danger" onclick="deleteEntry(${x.i})">Delete</button></td>`;
+  tb.appendChild(tr);
+ });
+ document.getElementById("total").textContent=diary.length;
+ document.getElementById("completed").textContent=diary.filter(x=>x.status==="Completed").length;
+ document.getElementById("pending").textContent=diary.filter(x=>x.status==="Pending").length;
+ document.getElementById("forwarded").textContent=diary.filter(x=>x.status==="Forwarded").length;
+ document.getElementById("summaryText").innerHTML=`<p><b>Diary owner:</b> Shubham</p>
+  <p><b>Period shown:</b> ${from?fmtDate(from):"Start"} to ${to?fmtDate(to):"Today"}</p>
+  <p><b>Total recorded work entries:</b> ${diary.length}</p>`;
+}
+
+function showTab(id,el){
+  var ids=["searchTab","entry","completedTab","pendingTab"];
+  ids.forEach(function(x){
+    var n=document.getElementById(x);
+    if(n) n.classList.toggle("hidden", x!==id);
+  });
+  document.querySelectorAll(".tab").forEach(function(t){
+    t.classList.toggle("active", t===el);
+  });
+  if(!el){
+    var autoTab=document.querySelector(".tab[data-tab=\""+id+"\"]");
+    if(autoTab) autoTab.classList.add("active");
+  }
+  if(id==="completedTab" && typeof renderStatusTable==="function")
+    renderStatusTable("Completed","completedRows");
+  if(id==="pendingTab" && typeof renderStatusTable==="function")
+    renderStatusTable("Pending","pendingRows");
+  if(id==="searchTab" && typeof render==="function") render();
+}
+
+function bindTabs(){
+  document.querySelectorAll(".tab").forEach(function(tab){
+    tab.addEventListener("click",function(e){
+      e.preventDefault();
+      showTab(tab.getAttribute("data-tab"),tab);
+    });
+    tab.addEventListener("touchend",function(e){
+      e.preventDefault();
+      showTab(tab.getAttribute("data-tab"),tab);
+    },{passive:false});
+  });
+}
+function populateWorkTypes(){
+ const box=document.getElementById("workOptions"); box.innerHTML="";
+ workTypes.forEach(w=>{
+  const d=document.createElement("div");
+  d.className="work-option"+(w===selectedWorkType?" selected":"");
+  d.textContent=w; d.onclick=()=>{selectedWorkType=w;populateWorkTypes();};
+  box.appendChild(d);
+ });
+}
+populateWorkTypes();
+
+function normalizeHeader(x){return String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function findValue(row,names){
+ const keys=Object.keys(row);
+ for(const wanted of names){
+  const nk=normalizeHeader(wanted);
+  const key=keys.find(k=>normalizeHeader(k).includes(nk));
+  if(key&&row[key]!=null)return String(row[key]).trim();
+ }
+ return "";
+}
+
+let pdfLedgerMembers = [], pdfLedgerSelected = new Set(), pdfLedgerWorkType = "";
+let pdfLedgerName = "", pdfLedgerData = "";
+
+function populatePdfLedgerWorkTypes(){
+  const preferred=["Submission Done","Forwarded to Next Level in System"];
+  const choices=[...preferred,...workTypes.filter(w=>!preferred.includes(w))];
+  const box=document.getElementById("pdfLedgerWorkOptions");
+  if(!box)return;
+  box.innerHTML="";
+  choices.forEach(w=>{
+    const d=document.createElement("div");
+    d.className="work-option"+(w===pdfLedgerWorkType?" selected":"");
+    d.textContent=w;
+    d.onclick=()=>{pdfLedgerWorkType=w;populatePdfLedgerWorkTypes();};
+    box.appendChild(d);
+  });
+}
+function renderPdfLedgerMembers(){
+  const list=document.getElementById("pdfLedgerMemberList");
+  if(!list)return;
+  list.innerHTML='<div class="memberrow head"><span>✓</span><span>Member ID</span><span>UAN</span><span>Name</span><span>Establishment</span></div>';
+  pdfLedgerMembers.forEach((m,i)=>{
+    const row=document.createElement("label");
+    row.className="memberrow";
+    row.innerHTML=`<input type="checkbox" ${pdfLedgerSelected.has(i)?"checked":""} onchange="togglePdfLedgerMember(${i},this.checked)">
+      <span>${escapeHtml(m.memberId||"-")}</span><span>${escapeHtml(m.uan||"-")}</span>
+      <span>${escapeHtml(m.name||"-")}</span><span>${escapeHtml(m.establishment||"-")}</span>`;
+    list.appendChild(row);
+  });
+}
+function togglePdfLedgerMember(i,c){c?pdfLedgerSelected.add(i):pdfLedgerSelected.delete(i);renderPdfLedgerMembers();}
+function selectAllPdfLedgerMembers(){pdfLedgerMembers.forEach((_,i)=>pdfLedgerSelected.add(i));renderPdfLedgerMembers();}
+function clearPdfLedgerMembers(){pdfLedgerSelected.clear();renderPdfLedgerMembers();}
+
+// Offline EPFO PDF extraction — uses the same fast extraction engine as EPFO_EPS_correction.html.
+function clean(s){return String(s??"").replace(/\s+/g," ").trim();}
+function isNum(s){return /^-?\d+(?:\.\d+)?$/.test(clean(s).replace(/,/g,""));}
+function isDate(s){return /^\d{2}\/\d{2}\/\d{4}$/.test(clean(s));}
+function isMonth(s){return /^\d{2}\/\d{4}$/.test(clean(s));}
+
+async function inflate(bytes){
+ // PDF /FlateDecode streams are zlib-wrapped. Browser DecompressionStream('deflate')
+ // handles the zlib wrapper directly and requires no network request.
+ if(!("DecompressionStream" in window))
+   throw new Error("This browser does not support DecompressionStream. Please use a recent Chrome, Edge, Firefox, or Safari.");
+ const ds=new DecompressionStream("deflate");
+ const stream=new Blob([bytes]).stream().pipeThrough(ds);
+ return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function latin(bytes){return new TextDecoder("latin1").decode(bytes);}
+function findBytes(buf,needle,start=0){
+ outer:for(let i=start;i<=buf.length-needle.length;i++){
+   for(let j=0;j<needle.length;j++)if(buf[i+j]!==needle[j])continue outer;
+   return i;
+ }return -1;
+}
+const enc=new TextEncoder();
+
+function parsePdfStreams(bytes){
+ const streams=[];
+ let pos=0;
+ const streamWord=enc.encode("stream");
+ const endWord=enc.encode("endstream");
+ while(true){
+   const a=findBytes(bytes,streamWord,pos);if(a<0)break;
+   let s=a+streamWord.length;
+   if(bytes[s]===13)s++;if(bytes[s]===10)s++;
+   const e=findBytes(bytes,endWord,s);if(e<0)break;
+   let raw=bytes.slice(s,e);
+   while(raw.length && (raw[raw.length-1]===10||raw[raw.length-1]===13))raw=raw.slice(0,-1);
+   // Determine whether the stream is FlateDecode by examining its object dictionary.
+   const dictStart=Math.max(0,bytes.lastIndexOf ? 0 : 0);
+   const before=latin(bytes.slice(Math.max(0,a-500),a));
+   streams.push({raw,flate:/\/FlateDecode\b/.test(before)});
+   pos=e+endWord.length;
+ }
+ return streams;
+}
+
+// Uint8Array has no lastIndexOf on all browsers, so use a byte-safe dictionary search.
+function streamDictionary(bytes,streamOffset){
+ let st=streamOffset-1, begin=Math.max(0,st-2000);
+ const txt=latin(bytes.slice(begin,streamOffset));
+ return txt;
+}
+
+async function decodeStreams(bytes){
+ const streams=[];
+ let pos=0,count=0;
+ const SW=enc.encode("stream"),EW=enc.encode("endstream");
+ while(true){
+   const a=findBytes(bytes,SW,pos);if(a<0)break;
+   let s=a+SW.length;if(bytes[s]===13)s++;if(bytes[s]===10)s++;
+   const e=findBytes(bytes,EW,s);if(e<0)break;
+   let raw=bytes.slice(s,e);
+   while(raw.length&&(raw.at(-1)===10||raw.at(-1)===13))raw=raw.slice(0,-1);
+   const dict=streamDictionary(bytes,a);
+   if(/\/FlateDecode\b/.test(dict)){
+     try{
+       const dec=await inflate(raw);
+       streams.push(dec);
+     }catch(e){ /* Ignore non-content Flate streams. */ }
+   }
+   count++;pos=e+EW.length;
+   
+ }
+ return streams;
+}
+
+function pdfString(raw){
+ let out="",depth=0;
+ for(let i=1;i<raw.length-1;i++){
+   const c=raw[i];
+   if(c===92){
+     const n=raw[++i];
+     const map={110:"\\n",114:"\\r",116:"\\t",98:"\\b",102:"\\f"};
+     if(map[n])out+=map[n];
+     else if(n>=48&&n<=55){
+       let oct=String.fromCharCode(n);
+       for(let k=0;k<2;k++){
+         const q=raw[i+1];
+         if(q>=48&&q<=55){oct+=String.fromCharCode(q);i++;}else break;
+       }
+       out+=String.fromCharCode(parseInt(oct,8));
+     }else out+=String.fromCharCode(n);
+   }else out+=String.fromCharCode(c);
+ }
+ return out;
+}
+
+function extractItems(content){
+ const s=latin(content), items=[];
+ // Text in this EPFO PDF is emitted as: 1 0 0 1 X Y Tm ... (text)Tj
+ const tmRe=/1\s+0\s+0\s+1\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Tm/g;
+ let m;
+ while((m=tmRe.exec(s))){
+   const x=parseFloat(m[1]),y=parseFloat(m[2]);
+   const from=m.index+m[0].length;
+   const limit=Math.min(s.length,from+2500);
+   const part=s.slice(from,limit);
+   const sm=/\(((?:\\.|[^\\()])*)\)\s*Tj/.exec(part);
+   if(sm)items.push({x,y,text:pdfString(sm[0].match(/^\((.*)\)Tj$/s)?.[0]||"("+sm[1]+")"),raw:sm[1]});
+ }
+ // The above string reconstruction is safer with a direct raw decoder.
+ return items.map(i=>({x:i.x,y:i.y,text:decodePdfLiteral(i.raw)})).filter(i=>i.text);
+}
+function decodePdfLiteral(raw){
+ let out="";
+ for(let i=0;i<raw.length;i++){
+   if(raw[i]!=="\\"){out+=raw[i];continue}
+   i++;if(i>=raw.length)break;
+   const c=raw[i],mp={n:"\n",r:"\r",t:"\t",b:"\b",f:"\f"};
+   if(mp[c])out+=mp[c];
+   else if(/[0-7]/.test(c)){
+     let o=c;
+     for(let k=0;k<2&&i+1<raw.length&&/[0-7]/.test(raw[i+1]);k++)o+=raw[++i];
+     out+=String.fromCharCode(parseInt(o,8));
+   }else out+=c;
+ }
+ return out;
+}
+
+function groupRows(items){
+ // Group y values within 6 points. This also joins wrapped Claim IDs and descriptions.
+ const lines=[];
+ for(const it of items.sort((a,b)=>b.y-a.y||a.x-b.x)){
+   let line=lines.find(l=>Math.abs(l.y-it.y)<=6);
+   if(!line){line={y:it.y,items:[]};lines.push(line);}
+   line.items.push(it);
+ }
+ lines.sort((a,b)=>b.y-a.y);
+ for(const l of lines)l.items.sort((a,b)=>a.x-b.x);
+ return lines;
+}
+
+function lineText(line){return clean(line.items.map(x=>x.text).join(" "));}
+function valuesAfterColon(line, minX=0, maxX=Infinity){
+ const colon=line.items.findIndex(x=>x.text.trim()===":");
+ if(colon<0)return "";
+ return clean(line.items.slice(colon+1).filter(x=>x.x>=minX&&x.x<maxX).map(x=>x.text).join(" "));
+}
+function extractMemberSummary(content){
+ const items=extractItems(content);
+ const lines=groupRows(items);
+ const out={uan:"",memberId:"",memberName:"",establishmentName:""};
+ // Prefer coordinate-aware extraction because the Member Summary page places
+ // two fields side-by-side on several rows.
+ for(const line of lines){
+   const t=lineText(line);
+   if(!out.uan && /\bUAN\b/i.test(t)){
+     const u=line.items.find(x=>/^[0-9]{8,15}$/.test(clean(x.text)) && x.x>190 && x.x<470);
+     if(u)out.uan=clean(u.text);
+     const mi=line.items.find(x=>/^[A-Z]{2,5}[A-Z0-9-]{8,30}$/.test(clean(x.text)) && x.x>530);
+     if(mi)out.memberId=clean(mi.text);
+   }
+   if(!out.memberName && /Member\s+Name\s*:/i.test(t)){
+     const colon=line.items.findIndex(x=>x.text.trim()===" :"||x.text.trim()===":");
+     const start=colon>=0?colon+1:0;
+     out.memberName=clean(line.items.slice(start).filter(x=>x.x>=190&&x.x<500).map(x=>x.text).join(" "));
+   }
+   if(!out.establishmentName && /Establishment\s+Name\s*:/i.test(t)){
+     const colon=line.items.findIndex(x=>x.text.trim()===" :"||x.text.trim()===":");
+     const start=colon>=0?colon+1:0;
+     out.establishmentName=clean(line.items.slice(start).filter(x=>x.x>=190&&x.x<500).map(x=>x.text).join(" "));
+   }
+ }
+ // Text fallback for PDFs whose first page text positioning differs.
+ const all=clean(items.map(x=>x.text).join(" "));
+ if(!out.uan){const m=all.match(/\bUAN\s+([0-9]{8,15})\b/i);if(m)out.uan=m[1];}
+ if(!out.memberId){const m=all.match(/\bMember\s+ID\s+([A-Z0-9-]{10,40})\b/i);if(m)out.memberId=m[1];}
+ if(!out.memberName){const m=all.match(/Member\s+Name\s*:\s*(.*?)\s+Date\s+of\s+Joining\s+PF\s*:/i);if(m)out.memberName=clean(m[1]);}
+ if(!out.establishmentName){const m=all.match(/Establishment\s+Name\s*:\s*(.*?)\s+Exemption\s+Status\s*:/i);if(m)out.establishmentName=clean(m[1]);}
+ return out;
+}
+
+function extractEPFOMemberRecords(file){
+  return file.arrayBuffer().then(async buf=>{
+    const bytes=new Uint8Array(buf);
+    if(!(bytes[0]===37&&bytes[1]===80&&bytes[2]===68&&bytes[3]===70)) throw new Error("The selected file is not a valid PDF.");
+    const streams=await decodeStreams(bytes);
+    if(!streams.length) throw new Error("No readable PDF text streams were found.");
+    const s=extractMemberSummary(streams[0]);
+    const memberId=String(s.memberId||'').trim();
+    const uan=String(s.uan||'').trim();
+    const name=String(s.memberName||'').trim();
+    const establishment=String(s.establishmentName||'').trim();
+    if(!memberId&&!uan&&!name) return [];
+    return [{memberId,uan:uan||'Not Available',name,establishment}];
+  });
+}
+
+async function processLedgerPdf(){
+  const file=document.getElementById("ledgerPdfFile").files[0],status=document.getElementById("uploadStatus");
+  if(!file){alert("Please select the ledger PDF.");return;}
+  if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){alert("Please select a PDF ledger.");return;}
+  if(file.size>20*1024*1024){alert("Please use a PDF up to 20 MB.");return;}
+  status.textContent="Reading EPFO ledger PDF...";
+  try{
+    pdfLedgerMembers=await extractEPFOMemberRecords(file);
+    pdfLedgerName=file.name;
+    if(!pdfLedgerMembers.length){
+      status.textContent="No EPFO member details found.";
+      alert("No EPFO member details could be extracted from this PDF.");
+      return;
+    }
+    pdfLedgerSelected.clear();
+    renderPdfLedgerMembers();
+    document.getElementById("pdfLedgerMemberArea").style.display="block";
+    status.textContent=`Data fetched immediately: ${pdfLedgerMembers.length} member record(s).`;
+  }catch(err){
+    console.error(err);
+    status.textContent="Could not read this EPFO PDF offline.";
+    alert("Could not read this EPFO PDF offline. Please use the same type of EPFO ledger PDF that works in the EPS correction module.");
+  }
+}
+
+function savePdfLedgerWork(){
+  if(!pdfLedgerMembers.length){alert("Upload a ledger PDF first.");return;}
+  if(!pdfLedgerSelected.size){alert("Select at least one member.");return;}
+  if(!pdfLedgerWorkType){alert("Select the work you completed.");return;}
+  const date=document.getElementById("pdfLedgerWorkDate").value,status=document.getElementById("pdfLedgerStatus").value,remark=document.getElementById("pdfLedgerRemark").value.trim();
+  if(!date){alert("Select the work date.");return;}
+  let added=0;
+  [...pdfLedgerSelected].forEach(i=>{
+    const m=pdfLedgerMembers[i],duplicate=diary.some(x=>x.date===date&&x.task.toLowerCase()===pdfLedgerWorkType.toLowerCase()&&x.memberId===m.memberId&&x.uan===m.uan);
+    if(!duplicate){diary.push({date,task:pdfLedgerWorkType,status,remark:remark||"Work recorded from uploaded ledger PDF.",memberName:m.name||"",memberId:m.memberId||"",uan:m.uan||"",pdfName:pdfLedgerName||"",pdfData:pdfLedgerData||""});added++;}
+  });
+  saveDiary();render();alert(`${added} member work entr${added===1?"y":"ies"} saved successfully.`);
+}
+
+function processLedger(){
+ const file=document.getElementById("ledgerFile").files[0];
+ if(!file){alert("Please select a ledger file.");return;}
+ const status=document.getElementById("uploadStatus"); status.textContent="Reading ledger...";
+ const reader=new FileReader();
+ reader.onload=e=>{
+  try{
+   const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   const raw=XLSX.utils.sheet_to_json(ws,{defval:""});
+   ledgerMembers=raw.map((r,i)=>({
+    sourceRow:i+2,memberId:findValue(r,["Member ID","MemberId","MID","PF Number","PF No"]),
+    uan:findValue(r,["UAN"]),name:findValue(r,["Name","Member Name"]),
+    establishment:findValue(r,["Establishment","Establishment Name","Employer"])
+   })).filter(x=>x.memberId||x.uan||x.name);
+   selectedMemberIndexes.clear(); renderMembers(); renderSelectedMembers();
+   document.getElementById("memberArea").style.display=ledgerMembers.length?"block":"none";
+   status.textContent=`Loaded ${ledgerMembers.length} member row(s) from ${file.name}.`;
+  }catch(err){console.error(err);status.textContent="Could not read the ledger. Check Excel/CSV file.";}
+ };
+ reader.readAsArrayBuffer(file);
+}
+function renderMembers(){
+ const list=document.getElementById("memberList");
+ list.innerHTML=`<div class="memberrow head"><span>✓</span><span>Member ID</span><span>UAN</span><span>Name</span><span>Establishment</span></div>`;
+ ledgerMembers.forEach((m,i)=>{
+  const row=document.createElement("label");row.className="memberrow";
+  row.innerHTML=`<input type="checkbox" ${selectedMemberIndexes.has(i)?"checked":""} onchange="toggleMember(${i},this.checked)">
+   <span>${escapeHtml(m.memberId||"-")}</span><span>${escapeHtml(m.uan||"-")}</span><span>${escapeHtml(m.name||"-")}</span><span>${escapeHtml(m.establishment||"-")}</span>`;
+  list.appendChild(row);
+ });
+}
+function toggleMember(i,c){c?selectedMemberIndexes.add(i):selectedMemberIndexes.delete(i);renderSelectedMembers();}
+function selectAllMembers(){ledgerMembers.forEach((_,i)=>selectedMemberIndexes.add(i));renderMembers();renderSelectedMembers();}
+function clearMemberSelection(){selectedMemberIndexes.clear();renderMembers();renderSelectedMembers();}
+function moveSelectedToWork(){
+ if(!selectedMemberIndexes.size){alert("Select at least one member.");return;}
+ document.getElementById("todayWorkCard").style.display="block";renderSelectedMembers();populateWorkTypes();
+ document.getElementById("todayWorkCard").scrollIntoView({behavior:"smooth"});
+}
+function renderSelectedMembers(){
+ const box=document.getElementById("selectedMembers");box.innerHTML="";
+ [...selectedMemberIndexes].forEach(i=>{const m=ledgerMembers[i];const c=document.createElement("span");c.className="member-chip";c.textContent=(m.name||"Member")+" | "+(m.memberId||m.uan||"");box.appendChild(c);});
+}
+function addSelectedWork(){
+ if(!selectedMemberIndexes.size){alert("Select member(s) first.");return;}
+ if(!selectedWorkType){alert("Please select the type of work.");return;}
+ const date=document.getElementById("ledgerDate").value,remark=document.getElementById("bulkRemark").value.trim();
+ [...selectedMemberIndexes].forEach(i=>{
+  const m=ledgerMembers[i];
+  const duplicate=diary.some(x=>x.date===date&&x.task===selectedWorkType&&x.memberId===m.memberId&&x.uan===m.uan);
+  if(!duplicate) diary.push({date,task:selectedWorkType,status:"Completed",remark:remark||"Work added from uploaded ledger.",memberName:m.name,memberId:m.memberId,uan:m.uan,pdfName:"",pdfData:""});
+ });
+ saveDiary();render();alert("Selected member work added.");document.getElementById("bulkRemark").value="";
+}
+
+function readPdfFile(input,callback){
+ const file=input.files[0];
+ if(!file){callback("","");return;}
+ if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){alert("Please select a PDF file.");input.value="";callback("","");return;}
+ if(file.size>8*1024*1024){alert("Please use a PDF up to 8 MB. Very large PDFs may exceed browser storage.");input.value="";callback("","");return;}
+ const r=new FileReader();r.onload=()=>callback(file.name,r.result);r.readAsDataURL(file);
+}
+
+let pdfExtractedMembers = [], pdfSelectedIndexes = new Set(), pdfAttachedName = "", pdfAttachedData = "";
+
+function getPdfJs(){
+  return window.pdfjsLib || window["pdfjs-dist/build/pdf.mjs"] || null;
+}
+
+async function extractPdfText(file){
+  if(!file) throw new Error("No PDF selected.");
+
+  // Use a built-in browser PDF text extractor first. This avoids any
+  // dependency on PDF.js/CDNs and therefore also works when this HTML file
+  // is opened directly on another PC.
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const latin1 = new TextDecoder("latin1");
+  const whole = latin1.decode(bytes);
+  let out = "";
+
+  function unescapePdfString(str){
+    return str.replace(/\\([\\()nrtbf])/g,(_,c)=>({"n":"\n","r":"\r","t":"\t","b":"\b","f":"\f"}[c]||c))
+      .replace(/\\(\d{1,3})/g,(_,o)=>String.fromCharCode(parseInt(o,8)));
+  }
+  function decodeTextOperators(raw){
+    let result="";
+    const tj=/\(((?:\\.|[^\\)])*)\)\s*Tj/g;
+    let m;
+    while((m=tj.exec(raw))) result += unescapePdfString(m[1]) + " ";
+
+    const tjArr=/\[((?:[^\]]|\][^\[])*?)\]\s*TJ/g;
+    while((m=tjArr.exec(raw))){
+      const a=m[1];
+      const parts=/\(((?:\\.|[^\\)])*)\)/g;
+      let q;
+      while((q=parts.exec(a))) result += unescapePdfString(q[1]) + " ";
+    }
+    // Single-quote text operators: (text) '
+    const sq=/\(((?:\\.|[^\\)])*)\)\s*'/g;
+    while((m=sq.exec(raw))) result += unescapePdfString(m[1]) + " ";
+    // Double-quote text operators: aw ac (text) "
+    const dq=/\(((?:\\.|[^\\)])*)\)\s*"/g;
+    while((m=dq.exec(raw))) result += unescapePdfString(m[1]) + " ";
+    // Hexadecimal text strings such as <4D4842...> Tj/TJ
+    const hx=/<([0-9A-Fa-f\s]+)>\s*Tj/g;
+    while((m=hx.exec(raw))){
+      const h=m[1].replace(/\s/g,""); let z="";
+      for(let i=0;i+1<h.length;i+=2) z+=String.fromCharCode(parseInt(h.slice(i,i+2),16));
+      result+=z+" ";
+    }
+    return result;
+  }
+  async function inflate(rawBytes){
+    if(typeof DecompressionStream!=="function") return null;
+    try{
+      const ds=new DecompressionStream("deflate");
+      const stream=new Blob([rawBytes]).stream().pipeThrough(ds);
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }catch(e){ return null; }
+  }
+
+  // Extract direct and Flate-compressed content streams.
+  let pos=0;
+  while(true){
+    const idx=whole.indexOf("stream",pos);
+    if(idx<0) break;
+    const dictStart=Math.max(whole.lastIndexOf("<<",idx), whole.lastIndexOf("endobj",idx));
+    const dict=whole.slice(dictStart,idx);
+    let dataStart=idx+6;
+    if(bytes[dataStart]===13 && bytes[dataStart+1]===10) dataStart+=2;
+    else if(bytes[dataStart]===10 || bytes[dataStart]===13) dataStart+=1;
+    const endIdx=whole.indexOf("endstream",dataStart);
+    if(endIdx<0) break;
+    let raw=bytes.slice(dataStart,endIdx);
+    // Remove a trailing CR/LF which belongs to the stream delimiter.
+    while(raw.length && (raw[raw.length-1]===10 || raw[raw.length-1]===13)) raw=raw.slice(0,-1);
+    if(/\/FlateDecode/i.test(dict)){
+      const dec=await inflate(raw);
+      if(dec) out += decodeTextOperators(latin1.decode(dec)) + "\n";
+    }else{
+      out += decodeTextOperators(latin1.decode(raw)) + "\n";
+    }
+    pos=endIdx+9;
+  }
+
+  // Some very simple PDFs have text operators outside a stream or use
+  // uncompressed object data. Include those as a final fallback.
+  if(!out.trim()) out=decodeTextOperators(whole);
+  if(!out.trim()) throw new Error("This PDF does not contain directly extractable text. It may be a scanned/image PDF.");
+  return out;
+}
+
+function parsePdfMembers(text){
+  const cleaned = String(text||"").replace(/\u00a0/g," ").replace(/\r/g,"\n");
+  const lines = cleaned.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const members = [];
+
+  // First try labelled fields. This handles PDFs containing labels such as
+  // "Member ID", "UAN" and "Name" anywhere in the text.
+  const midRe = /\b(?:member\s*id|member\s*no|memberid|mid|pf\s*(?:number|no))\s*[:\-]?\s*([A-Z0-9\/._-]{4,})/i;
+  const uanRe = /\bUAN\s*[:\-]?\s*(\d{8,12})\b/i;
+  const nameRe = /\b(?:member\s*name|name)\s*[:\-]?\s*([A-Za-z][A-Za-z .,'-]{2,})/i;
+
+  let current = {memberId:"",uan:"",name:""};
+  for(const line of lines){
+    const m1=line.match(midRe), m2=line.match(uanRe), m3=line.match(nameRe);
+    if(m1) current.memberId=m1[1].trim();
+    if(m2) current.uan=m2[1].trim();
+    if(m3) current.name=m3[1].trim();
+    if(current.memberId || current.uan || current.name){
+      if(current.memberId || current.uan){
+        const key=(current.memberId+"|"+current.uan+"|"+current.name).toLowerCase();
+        if(!members.some(x=>(x.memberId+"|"+x.uan+"|"+x.name).toLowerCase()===key)){
+          members.push({...current});
+        }
+        current={memberId:"",uan:"",name:""};
+      }
+    }
+  }
+
+  // Second try table-like lines containing a 12-digit UAN and a likely MID.
+  for(const line of lines){
+    const u=line.match(/\b(\d{12})\b/);
+    if(!u) continue;
+    const mid=line.match(/\b([A-Z]{1,5}\/[A-Z0-9\/-]{3,})\b/i) ||
+              line.match(/\b([A-Z0-9]{3,}[-/][A-Z0-9/-]{2,})\b/i);
+    if(mid){
+      let before=line.replace(u[1]," ").replace(mid[1]," ").replace(/\s+/g," ").trim();
+      // Avoid treating headings/labels as names.
+      before=before.replace(/\b(UAN|MEMBER|NAME|ID|ESTABLISHMENT)\b/gi,"").trim();
+      const name=(before.match(/[A-Za-z][A-Za-z .,'-]{2,}/)||[""])[0].trim();
+      const item={memberId:mid[1],uan:u[1],name:name};
+      const key=(item.memberId+"|"+item.uan+"|"+item.name).toLowerCase();
+      if(!members.some(x=>(x.memberId+"|"+x.uan+"|"+x.name).toLowerCase()===key)) members.push(item);
+    }
+  }
+  return members;
+}
+
+function renderPdfMembers(){
+  const list=document.getElementById("pdfMemberList");
+  list.innerHTML='<div class="memberrow head"><span>✓</span><span>Member ID</span><span>UAN</span><span>Name</span><span>Source</span></div>';
+  pdfExtractedMembers.forEach((m,i)=>{
+    const row=document.createElement("label");
+    row.className="memberrow";
+    row.innerHTML=`<input type="checkbox" ${pdfSelectedIndexes.has(i)?"checked":""} onchange="togglePdfMember(${i},this.checked)">
+      <span>${escapeHtml(m.memberId||"-")}</span><span>${escapeHtml(m.uan||"-")}</span>
+      <span>${escapeHtml(m.name||"-")}</span><span>Uploaded PDF</span>`;
+    list.appendChild(row);
+  });
+}
+
+function togglePdfMember(i,c){c?pdfSelectedIndexes.add(i):pdfSelectedIndexes.delete(i);renderPdfMembers();}
+function selectAllPdfMembers(){pdfExtractedMembers.forEach((_,i)=>pdfSelectedIndexes.add(i));renderPdfMembers();}
+function clearPdfMembers(){pdfSelectedIndexes.clear();renderPdfMembers();}
+
+async function handleWorkPdf(){
+  const input=document.getElementById("workPdf"), file=input.files[0], status=document.getElementById("pdfWorkStatus");
+  if(!file){status.textContent="No PDF selected.";return;}
+  if(file.type!=="application/pdf" && !file.name.toLowerCase().endsWith(".pdf")){
+    alert("Please select a PDF file."); input.value=""; return;
+  }
+  if(file.size>8*1024*1024){
+    alert("Please use a PDF up to 8 MB."); input.value=""; return;
+  }
+  status.textContent="Reading PDF and extracting member details...";
+  try{
+    const text=await extractPdfText(file);
+    pdfExtractedMembers=parsePdfMembers(text);
+    pdfSelectedIndexes.clear();
+    pdfAttachedName=file.name;
+    const r=new FileReader();
+    r.onload=()=>{
+      pdfAttachedData=r.result;
+      document.getElementById("pdfWorkArea").style.display="block";
+      renderPdfMembers();
+      populatePdfWorkTypes();
+      if(!pdfExtractedMembers.length){
+        status.textContent="PDF opened, but no Member ID/UAN could be detected. This may be a scanned/image PDF or use different field labels.";
+        alert("PDF was opened, but member details could not be extracted. If the PDF is scanned, OCR is required.");
+      }else{
+        status.textContent=`Found ${pdfExtractedMembers.length} member(s) in ${file.name}. Select the members and work done.`;
+        selectAllPdfMembers();
+      }
+    };
+    r.readAsDataURL(file);
+  }catch(e){
+    console.error(e);
+    status.textContent="Could not read this PDF.";
+    alert(e.message||"Could not read the PDF.");
+  }
+}
+
+function populatePdfWorkTypes(){
+  const box=document.getElementById("pdfWorkOptions"); if(!box)return;
+  box.innerHTML="";
+  workTypes.forEach(w=>{
+    const d=document.createElement("div");
+    d.className="work-option"+(w===selectedWorkType?" selected":"");
+    d.textContent=w;
+    d.onclick=()=>{selectedWorkType=w;populatePdfWorkTypes();};
+    box.appendChild(d);
+  });
+}
+
+function savePdfWork(){
+  if(!pdfExtractedMembers.length){alert("Upload a member PDF first.");return;}
+  if(!pdfSelectedIndexes.size){alert("Select at least one member.");return;}
+  if(!selectedWorkType){alert("Select the work you completed.");return;}
+  const date=document.getElementById("pdfWorkDate").value;
+  const status=document.getElementById("pdfWorkStatusSelect").value;
+  const remark=document.getElementById("pdfWorkRemark").value.trim();
+  if(!date){alert("Select the work date.");return;}
+
+  let added=0;
+  [...pdfSelectedIndexes].forEach(i=>{
+    const m=pdfExtractedMembers[i];
+    const duplicate=diary.some(x=>x.date===date&&x.task.toLowerCase()===selectedWorkType.toLowerCase()&&
+      x.memberId===m.memberId&&x.uan===m.uan);
+    if(!duplicate){
+      diary.push({
+        date,task:selectedWorkType,status,
+        remark:remark||"Work recorded from uploaded PDF.",
+        memberName:m.name||"",memberId:m.memberId||"",uan:m.uan||"",
+        pdfName:pdfAttachedName||"",pdfData:pdfAttachedData||""
+      });
+      added++;
+    }
+  });
+  saveDiary(); render();
+  alert(`${added} work entr${added===1?"y":"ies"} saved successfully.`);
+}
+
+
+function showPdfStep(step){
+  const up=document.getElementById("pdfUploadStep"), ex=document.getElementById("pdfExtractedStep");
+  const b1=document.getElementById("pdfStepUpload"), b2=document.getElementById("pdfStepExtracted");
+  if(step==="extracted" && b2.disabled) return;
+  up.style.display=step==="upload"?"block":"none";
+  ex.style.display=step==="extracted"?"block":"none";
+  b1.classList.toggle("active",step==="upload");
+  b2.classList.toggle("active",step==="extracted");
+}
+
+function enablePdfExtractedStep(){
+  const b=document.getElementById("pdfStepExtracted");
+  if(b){b.disabled=false; b.textContent="2. Extracted Data ✓";}
+  showPdfStep("extracted");
+}
+
+async function autoFillFromAttachedPdf(input){
+  // The HTML onchange calls this with no argument; use the actual file input.
+  const el=input||document.getElementById("epdf");
+  const file=el&&el.files&&el.files[0];
+  const status=document.getElementById("pdfAutoStatus");
+  if(!file){if(status)status.textContent="";return;}
+  if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){
+    alert("Please select a PDF file."); el.value=""; return;
+  }
+  if(file.size>20*1024*1024){alert("Please use a PDF up to 20 MB.");el.value="";return;}
+  try{
+    if(status)status.textContent="Reading EPFO ledger PDF offline...";
+    const members=await extractEPFOMemberRecords(file);
+    if(!members.length){
+      if(status)status.textContent="No EPFO member details found in this PDF.";
+      alert("No EPFO member details could be extracted from the PDF header.");
+      return;
+    }
+    const m=members[0];
+    pdfAttachedName=file.name;
+    pdfAttachedData="";
+    document.getElementById("currentPdf").textContent="PDF: "+file.name;
+    document.getElementById("edate").value=new Date().toISOString().slice(0,10);
+    document.getElementById("ememberName").value=m.memberName||"";
+    document.getElementById("ememberId").value=m.memberId||"";
+    document.getElementById("euan").value=m.uan||"Not Available";
+    document.getElementById("pdfStepExtracted").disabled=false;
+    enablePdfExtractedStep();
+    if(status)status.textContent=`Extracted ${members.length} member record(s) offline.`;
+    // Keep the PDF available for saving without forcing the browser to store it
+    // until the user actually clicks Save Entry.
+    readPdfFile(el,(name,data)=>{pdfAttachedName=name;pdfAttachedData=data;});
+  }catch(e){
+    console.error(e);
+    if(status)status.textContent="Could not read this EPFO PDF offline.";
+    alert("Could not read this EPFO PDF offline. This extractor requires a text-based EPFO ledger PDF.");
+  }
+}
+function parseAutoPdfMembers(text){ return parseLedgerPdfText(text); }
+function renderAutoWorkChoices(){
+  const sel=document.getElementById("etask");
+  if(!sel)return;
+  sel.value="";
+}
+
+function saveEntry(){
+ const date=document.getElementById("edate").value,task=document.getElementById("etask").value.trim();
+ const status=document.getElementById("estatus").value,remark=document.getElementById("eremark").value.trim();
+ const memberName=document.getElementById("ememberName").value.trim(),memberId=document.getElementById("ememberId").value.trim(),uan=document.getElementById("euan").value.trim();
+ if(!date||!task){alert("Please enter date and work details.");return;}
+ const duplicate=diary.some((x,i)=>i!==editIndex&&x.date===date&&x.task.toLowerCase()===task.toLowerCase()&&x.memberId===memberId&&x.uan===uan);
+ if(duplicate){alert("A similar entry already exists for this date.");return;}
+ const old=editIndex>=0?normalizeEntry(diary[editIndex]):{};
+ const pdfInput=document.getElementById("epdf");
+ const finish=(pdfName,pdfData)=>{
+  const obj={date,task,status,remark,memberName,memberId,uan,pdfName:pdfName||old.pdfName||"",pdfData:pdfData||old.pdfData||""};
+  if(editIndex>=0)diary[editIndex]=obj;else diary.push(obj);
+  saveDiary();render();clearForm();alert(editIndex>=0?"Entry updated successfully.":"Entry saved successfully.");
+  editIndex=-1;
+ };
+ if(pdfInput.files[0]) readPdfFile(pdfInput,finish); else finish("", "");
+}
+function editEntry(i){
+ editIndex=i;const x=normalizeEntry(diary[i]);
+ document.getElementById("edate").value=x.date;document.getElementById("etask").value=x.task;document.getElementById("estatus").value=x.status;document.getElementById("eremark").value=x.remark;
+ document.getElementById("ememberName").value=x.memberName;document.getElementById("ememberId").value=x.memberId;document.getElementById("euan").value=x.uan;
+ document.getElementById("epdf").value="";
+ document.getElementById("currentPdf").innerHTML=x.pdfName?`Current PDF: <button class="gray" onclick="openPdf(${i})">${escapeHtml(x.pdfName)}</button>`:"No PDF attached";
+ showTab("entry",document.querySelectorAll(".tab")[3]);
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+function deleteEntry(i){if(confirm("Delete this work entry?")){diary.splice(i,1);saveDiary();render();}}
+function clearForm(){
+ showPdfStep("upload");
+ const b=document.getElementById("pdfStepExtracted"); if(b){b.disabled=true;b.textContent="2. Extracted Data";}
+
+ editIndex=-1;
+ document.getElementById("edate").value=new Date().toISOString().slice(0,10);
+ document.getElementById("etask").value="";document.getElementById("estatus").value="Completed";document.getElementById("eremark").value="";
+ document.getElementById("ememberName").value="";document.getElementById("ememberId").value="";document.getElementById("euan").value="";
+ document.getElementById("epdf").value="";document.getElementById("currentPdf").textContent="No PDF attached";
+}
+function openPdf(i){
+ const x=normalizeEntry(diary[i]);if(!x.pdfData){alert("No PDF attached.");return;}
+ const w=window.open();if(w){w.document.write(`<title>${escapeHtml(x.pdfName||"PDF")}</title><iframe src="${x.pdfData}" style="width:100%;height:100vh;border:0"></iframe>`);w.document.close();}
+}
+function fetchWork(){
+ const date=document.getElementById("fetchDate").value,type=document.getElementById("fetchType").value,number=document.getElementById("fetchNumber").value.trim().toLowerCase();
+ if(!number){alert("Please enter Member ID or UAN.");return;}
+ const matches=diary.map((x,i)=>({...normalizeEntry(x),i})).filter(x=>(!date||x.date===date)&&String(type==="memberId"?x.memberId:x.uan).toLowerCase()===number);
+ const result=document.getElementById("fetchResult"),body=document.getElementById("fetchRows"),details=document.getElementById("fetchMemberDetails");
+ result.style.display="block";body.innerHTML="";
+ if(!matches.length){details.innerHTML=`<b>No work found</b> for ${escapeHtml(number)}${date?" on "+fmtDate(date):""}.`;return;}
+ const f=matches[0];
+ details.innerHTML=`<b>Member:</b> ${escapeHtml(f.memberName||"-")} &nbsp; | &nbsp; <b>Member ID:</b> ${escapeHtml(f.memberId||"-")} &nbsp; | &nbsp; <b>UAN:</b> ${escapeHtml(f.uan||"-")}`;
+ matches.forEach((x,i)=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${i+1}</td><td>${fmtDate(x.date)}</td><td>${escapeHtml(x.memberId||"-")}</td><td>${escapeHtml(x.uan||"-")}</td><td>${escapeHtml(x.memberName||"-")}</td><td>${escapeHtml(x.task)}</td><td>${escapeHtml(x.status)}<br>${escapeHtml(x.remark||"")}${x.pdfName?`<br>📎 ${escapeHtml(x.pdfName)}`:""}</td>`;body.appendChild(tr);});
+}
+function clearFetch(){document.getElementById("fetchNumber").value="";document.getElementById("fetchDate").value="";document.getElementById("fetchResult").style.display="none";}
+function generateDatePdf(){
+ const date=document.getElementById("pdfDate").value;if(!date){alert("Select a date first.");return;}
+ const entries=diary.filter(x=>x.date===date);if(!entries.length){alert("No work entries found for "+fmtDate(date)+".");return;}
+ if(!window.jspdf?.jsPDF){alert("PDF library is still loading. Check internet connection and try again.");return;}
+ const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),margin=12,pageH=297,width=186;
+ let y=18;
+ doc.setFontSize(15);doc.setFont(undefined,"bold");doc.text("EPFO — Shubham Work Diary",margin,y);y+=8;
+ doc.setFontSize(11);doc.setFont(undefined,"normal");doc.text("Date: "+day(date)+", "+fmtDate(date),margin,y);y+=8;doc.line(margin,y,198,y);y+=7;
+ entries.forEach((x,i)=>{
+  const lines=doc.splitTextToSize(`${i+1}. ${x.task}`,width);
+  const info=doc.splitTextToSize(`Member: ${x.memberName||"-"} | Member ID: ${x.memberId||"-"} | UAN: ${x.uan||"-"}`,width);
+  const rem=doc.splitTextToSize(`Status: ${x.status} | Remarks: ${x.remark||"-"}`,width);
+  const need=(lines.length+info.length+rem.length)*5+8;
+  if(y+need>280){doc.addPage();y=18;}
+  doc.setFont(undefined,"bold");doc.text(lines,margin,y);y+=lines.length*5;
+  doc.setFont(undefined,"normal");doc.text(info,margin,y);y+=info.length*5;
+  doc.text(rem,margin,y);y+=rem.length*5+5;doc.line(margin,y,198,y);y+=5;
+ });
+ doc.save("Shubham_Work_Diary_"+date+".pdf");
+}
+function exportDiaryBackup(){
+ const blob=new Blob([JSON.stringify(diary,null,2)],{type:"application/json"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download="Shubham_Work_Diary_Backup.json";a.click();URL.revokeObjectURL(a.href);
+}
+function restoreDiaryBackup(event){
+ const file=event.target.files[0];if(!file)return;const r=new FileReader();
+ r.onload=e=>{try{const p=JSON.parse(e.target.result);if(!Array.isArray(p))throw 0;diary=p.map(normalizeEntry);saveDiary();render();alert("Diary restored successfully.");}catch(err){alert("Invalid backup file.");}event.target.value="";};r.readAsText(file);
+}
+(function init(){const t=new Date().toISOString().slice(0,10);document.getElementById("from").value="";document.getElementById("to").value=t;document.getElementById("pdfDate").value=t;document.getElementById("edate").value=t;document.getElementById("pdfWorkDate").value=t;document.getElementById("pdfLedgerWorkDate").value=t;
+const wpi=document.getElementById("workPdf"); if(wpi) wpi.addEventListener("change",handleWorkPdf); renderStatusTable("Completed","completedRows"); renderStatusTable("Pending","pendingRows"); render();})();
+
+
+if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){bindTabs();showTab("searchTab",document.querySelector(".tab"));});}else{bindTabs();showTab("searchTab",document.querySelector(".tab"));}
+</script>
+</body>
+</html>
